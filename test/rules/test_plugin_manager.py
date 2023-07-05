@@ -1280,7 +1280,7 @@ def test_markdown_with_plugins_list_only():
   md046  code-block-style                        True       True       0.5.0
   md047  single-trailing-newline                 True       True       0.5.0
   md048  code-fence-style                        True       True       0.5.0
-
+  md051  unused-assets                           False      False      0.5.0
 """
     expected_error = ""
 
@@ -1357,6 +1357,7 @@ def test_markdown_with_plugins_list_only_all():
   md046  code-block-style                        True       True       0.5.0
   md047  single-trailing-newline                 True       True       0.5.0
   md048  code-fence-style                        True       True       0.5.0
+  md051  unused-assets                           False      False      0.5.0
   md999  debug-only                              False      False      0.0.0
 
 """
