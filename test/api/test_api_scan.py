@@ -235,6 +235,7 @@ def test_api_scan_recursive_for_directory():
         f"{rules_prefix}rule_md046.md",
         f"{rules_prefix}rule_md048.md",
         f"{rules_prefix}rule_md049.md",
+        f"{rules_prefix}rule_md050.md",
     ]
 
     # Act
@@ -247,7 +248,7 @@ def test_api_scan_recursive_for_directory():
     for i in scan_result.scan_failures:
         itemized_scan_failures = itemized_scan_failures + "\n" + str(i)
     print(itemized_scan_failures)
-    assert len(scan_result.scan_failures) == 136
+    assert len(scan_result.scan_failures) == 143
 
     scan_failures = []
     for i in scan_result.scan_failures:

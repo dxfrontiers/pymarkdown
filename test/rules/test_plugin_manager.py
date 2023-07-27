@@ -1281,6 +1281,7 @@ def test_markdown_with_plugins_list_only():
   md047  single-trailing-newline                 True       True       0.5.0
   md048  code-fence-style                        True       True       0.5.0
   md049  validate-refs                           False      False      0.0.2
+  md050  refs-regex                              False      False      0.0.1
 
 """
     expected_error = ""
@@ -1359,6 +1360,7 @@ def test_markdown_with_plugins_list_only_all():
   md047  single-trailing-newline                 True       True       0.5.0
   md048  code-fence-style                        True       True       0.5.0
   md049  validate-refs                           False      False      0.0.2
+  md050  refs-regex                              False      False      0.0.1
   md999  debug-only                              False      False      0.0.0
 
 """
