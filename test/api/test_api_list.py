@@ -382,6 +382,7 @@ def test_api_list_recursive_for_directory():
         "{rules}rule_md048.md",
         "{rules}rule_md049.md",
         "{rules}rule_md050.md",
+        "{rules}rule_md051.md",
         "writing_rule_plugins.md",
     ]
     expected_paths = []
