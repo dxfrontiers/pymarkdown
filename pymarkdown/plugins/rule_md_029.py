@@ -115,7 +115,11 @@ class RuleMd029(RulePlugin):
     ) -> Tuple[Optional[str], Optional[int]]:
         if list_style:
             list_token = cast(ListStartMarkdownToken, token)
-            new_number: Optional[int] = int(list_token.list_start_content)
+            new_number: Optional[int] = None
+            try:
+                new_number = int(list_token.list_start_content)
+            except ValueError:
+                pass
             # print(f"list_style={list_style},last_known_number={last_known_number},new_number={new_number}")
             if list_style == RuleMd029.__one_or_ordered_style:
                 list_style = (
