@@ -217,7 +217,7 @@ def test_md051_with_configuration():
             "md051": {
                 "enabled": True,
                 "assetsglob": "**/assets2use/**/*",
-                "assetsregex": r".*\.(txt)$"
+                "assetsregex": r".*\.(txt)$",
             }
         }
     }

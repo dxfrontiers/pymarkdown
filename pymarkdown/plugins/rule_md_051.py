@@ -18,6 +18,7 @@ class RuleMd051(RulePlugin):
     """
     Class to implement a plugin that looks for unused assets.
     """
+
     ASSET_DEFAULT_REGEX = r".*\.(jpg|jpeg|png|gif)$"
 
     def __init__(self) -> None:
