@@ -3,8 +3,8 @@ Module to implement a plugin that validates references based on configurable reg
 """
 import dataclasses
 import re
+from typing import Generator, List, Optional, Pattern, Tuple, cast
 
-from typing import Optional, Tuple, cast, List, Generator, Pattern
 from pymarkdown.inline_markdown_token import ReferenceMarkdownToken
 from pymarkdown.markdown_token import MarkdownToken
 from pymarkdown.plugin_manager.plugin_details import PluginDetails
