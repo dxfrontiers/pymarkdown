@@ -42,20 +42,6 @@ def test_html_tags_in_heading():
     assert result
 
 
-def test_html_tags_in_heading2():
-    """
-    Test to verify that CamelCase is converted into kebab-case
-    """
-    # Arrange
-    text = "2- Adding a New Admin by <kbd> Change Role </kbd> Button in People Page"
-    # Act
-    result = compare_anchor(
-        "2-adding-a-new-admin-by-kbd-change-role-button-in-people-page", text
-    )
-    # Assert
-    assert not result
-
-
 def test_tiggs_in_heading():
     """
     Test to verify that CamelCase is converted into kebab-case
@@ -92,6 +78,18 @@ def test_inlinecode_in_heading():
     result = compare_anchor(
         "tb-img-activity-dtbom00_chsetb---assign-a-table-to-change-set", text
     )
+    # Assert
+    assert result
+
+
+def test_inlinecode_extrem_in_heading():
+    """
+    Test to verify that CamelCase is converted into kebab-case
+    """
+    # Arrange
+    text = "TB-Workflow  `<Name>[Parameters]`"
+    # Act
+    result = compare_anchor("tb-workflow-nameparameters", text)
     # Assert
     assert result
 

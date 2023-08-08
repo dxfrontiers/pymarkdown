@@ -1,6 +1,7 @@
 """
 Module to implement a plugin that validates uris fo links and images.
 """
+import html
 import os.path
 import re
 import urllib.parse
@@ -77,7 +78,7 @@ class RuleMd049(RulePlugin):
             return
 
         link_scheme, link_uri, link_anchor = self._extract_link_uri(token)
-        if link_scheme != "file":
+        if link_scheme != "":
             # External link so nothing to do here
             return
 
@@ -142,7 +143,7 @@ class RuleMd049(RulePlugin):
     @staticmethod
     def _extract_link_uri(token: MarkdownToken) -> Tuple[str, str, Optional[str]]:
         ref_token = cast(ReferenceMarkdownToken, token)
-        parsed_uri = urllib.parse.urlparse(ref_token.link_uri, "file")
+        parsed_uri = urllib.parse.urlparse(ref_token.link_uri)
         return parsed_uri.scheme, parsed_uri.path, parsed_uri.fragment
 
 
@@ -192,7 +193,6 @@ class HeadingProcessor:
         return self.__headings_map.get(filename, [])
 
 
-HTML_TAGS_REGEX: Pattern[str] = re.compile(r"\<[^>]*\>")
 ANCHOR_REGEX: Pattern[str] = re.compile(r"([^A-Za-z0-9]+)")
 
 
@@ -204,7 +204,7 @@ def compare_anchor(anchor: str, headline: str) -> bool:
         ANCHOR_REGEX.sub(r".*", urllib.parse.unquote_plus(anchor)),
         re.ASCII | re.IGNORECASE,
     )
-    cleaned_headline = ANCHOR_REGEX.sub(r"", HTML_TAGS_REGEX.sub(r"", headline))
+    cleaned_headline = ANCHOR_REGEX.sub(r"", html.unescape(headline))
     return bool(anchor_re.match(cleaned_headline))
 
 
