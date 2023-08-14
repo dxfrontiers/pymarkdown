@@ -14,6 +14,7 @@ from pymarkdown.inline_markdown_token import (
 )
 from pymarkdown.leaf_markdown_token import SetextHeadingMarkdownToken
 from pymarkdown.markdown_token import MarkdownToken
+from pymarkdown.parser_helper import ParserHelper
 from pymarkdown.plugin_manager.plugin_details import PluginDetails
 from pymarkdown.plugin_manager.plugin_scan_context import PluginScanContext
 from pymarkdown.plugin_manager.rule_plugin import RulePlugin
@@ -175,7 +176,12 @@ class HeadingProcessor:
             self.__heading_text += text_token.token_text
         elif self.__start_token and token.is_inline_code_span:
             inline_code_token = cast(InlineCodeSpanMarkdownToken, token)
-            self.__heading_text += inline_code_token.span_text
+            # Restore inline code element to create correct github link_fragment
+            self.__heading_text += inline_code_token.extracted_start_backticks
+            self.__heading_text += html.unescape(
+                ParserHelper.resolve_all_from_text(inline_code_token.span_text)
+            )
+            self.__heading_text += inline_code_token.extracted_start_backticks
 
     def completed_file(self, filename: str) -> None:
         """
@@ -193,19 +199,20 @@ class HeadingProcessor:
         return self.__headings_map.get(filename, [])
 
 
-ANCHOR_REGEX: Pattern[str] = re.compile(r"([^A-Za-z0-9]+)")
+SPECIAL_CHAR_REGEX: Pattern[str] = re.compile(r"[^\w\s-]")
+SPACE_REGEX: Pattern[str] = re.compile(r"[ \t\n\r\f\v]+")
+SPECIAL_SPACE_REGEX: Pattern[str] = re.compile(r"[\s]")
 
 
 def compare_anchor(anchor: str, headline: str) -> bool:
     """
     Converts a kebab-case anchor into a regex.
     """
-    anchor_re = re.compile(
-        ANCHOR_REGEX.sub(r".*", urllib.parse.unquote_plus(anchor)),
-        re.ASCII | re.IGNORECASE,
-    )
-    cleaned_headline = ANCHOR_REGEX.sub(r"", html.unescape(headline))
-    return bool(anchor_re.match(cleaned_headline))
+    cleaned = headline.lower()
+    # cleaned = SPACE_REGEX.sub('-', cleaned)
+    cleaned = SPECIAL_SPACE_REGEX.sub("-", cleaned)
+    cleaned = SPECIAL_CHAR_REGEX.sub("", cleaned)
+    return cleaned == anchor
 
 
 class AnchorValidator:
