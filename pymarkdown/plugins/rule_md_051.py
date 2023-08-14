@@ -3,8 +3,9 @@ Module to implement a plugin that looks for unused assets.
 """
 import os
 import re
+import urllib
 from pathlib import Path
-from typing import Callable, Pattern, Set, cast
+from typing import Callable, Pattern, Set, Tuple, cast
 
 from pymarkdown.inline_markdown_token import ReferenceMarkdownToken
 from pymarkdown.markdown_token import MarkdownToken
@@ -55,8 +56,6 @@ class RuleMd051(RulePlugin):
             )
         )
 
-    EXTERNAL_LINK_REGEX = re.compile("^(.+):.*$")
-
     def next_token(self, context: PluginScanContext, token: MarkdownToken) -> None:
         """
         Event that a new token is being processed.
@@ -65,8 +64,8 @@ class RuleMd051(RulePlugin):
             # Not a reference so nothing to do here
             return
 
-        link_uri = self._extract_link_uri(token)
-        if self.EXTERNAL_LINK_REGEX.match(link_uri):
+        link_scheme, link_uri = self._extract_link_uri(token)
+        if link_scheme != "":
             # External link so nothing to do here
             return
 
@@ -103,12 +102,15 @@ class RuleMd051(RulePlugin):
         if not link_uri:
             path = context.scan_file
         elif link_uri.startswith("/"):
-            path = link_uri[1:]
+            path = urllib.parse.unquote(link_uri[1:])
         else:
-            path = os.path.join(os.path.dirname(context.scan_file), link_uri)
+            path = os.path.join(
+                os.path.dirname(context.scan_file), urllib.parse.unquote(link_uri)
+            )
         return os.path.realpath(path)
 
     @staticmethod
-    def _extract_link_uri(token: MarkdownToken) -> str:
+    def _extract_link_uri(token: MarkdownToken) -> Tuple[str, str]:
         ref_token = cast(ReferenceMarkdownToken, token)
-        return ref_token.link_uri.split("#", 1)[0]
+        parsed_uri = urllib.parse.urlparse(ref_token.link_uri)
+        return parsed_uri.scheme, parsed_uri.path
