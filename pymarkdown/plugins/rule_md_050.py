@@ -3,7 +3,7 @@ Module to implement a plugin that validates references based on configurable reg
 """
 import dataclasses
 import re
-from typing import Generator, List, Optional, Pattern, Tuple, cast
+from typing import List, Optional, Pattern, Tuple, cast
 
 from pymarkdown.inline_markdown_token import ReferenceMarkdownToken
 from pymarkdown.markdown_token import MarkdownToken
@@ -40,7 +40,11 @@ class RuleMd050(RulePlugin):
         """
         Event to allow the plugin to load configuration information.
         """
-        for index in self.config_indeces():
+        index = 1
+        while (
+            self.plugin_configuration.get_string_property(f"regexes.{index}.regex")
+            is not None
+        ):
             self.__regexes.append(
                 RegexPair(
                     re.compile(
@@ -53,19 +57,7 @@ class RuleMd050(RulePlugin):
                     ),
                 )
             )
-
-    def config_indeces(self) -> Generator[int, None, None]:
-        """
-        Generator for indices for variable-size list of config arguments.
-        """
-        idx = 1
-
-        while (
-            self.plugin_configuration.get_string_property(f"regexes.{idx}.regex")
-            is not None
-        ):
-            yield idx
-            idx += 1
+            index += 1
 
     def next_token(self, context: PluginScanContext, token: MarkdownToken) -> None:
         """
