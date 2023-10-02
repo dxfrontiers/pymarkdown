@@ -12,7 +12,7 @@ import pytest
 def test_md051_all_assets_are_referenced():
     """
     Test to make sure this rule does not trigger with a document that
-    contains a Atx heading that does not end in punctuation.
+    contains an Atx heading that does not end in punctuation.
     """
 
     # Arrange
