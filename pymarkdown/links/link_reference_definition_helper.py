@@ -4,6 +4,11 @@ Module to helper with the parsing of link reference definitions.
 import logging
 from typing import List, Optional, Tuple, cast
 
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.parser_state import ParserState
+from pymarkdown.general.position_marker import PositionMarker
+from pymarkdown.general.requeue_line_info import RequeueLineInfo
 from pymarkdown.links.link_reference_definition_continuation_helper import (
     LinkReferenceDefinitionContinuationHelper,
 )
@@ -11,13 +16,8 @@ from pymarkdown.links.link_reference_definition_parse_helper import (
     LinkReferenceDefinitionParseHelper,
 )
 from pymarkdown.links.link_reference_tuple import LinkReferenceDefinitionTuple
-from pymarkdown.markdown_token import MarkdownToken
-from pymarkdown.parser_helper import ParserHelper
-from pymarkdown.parser_logger import ParserLogger
-from pymarkdown.parser_state import ParserState
-from pymarkdown.position_marker import PositionMarker
-from pymarkdown.requeue_line_info import RequeueLineInfo
-from pymarkdown.stack_token import LinkDefinitionStackToken
+from pymarkdown.tokens.markdown_token import MarkdownToken
+from pymarkdown.tokens.stack_token import LinkDefinitionStackToken
 
 POGGER = ParserLogger(logging.getLogger(__name__))
 

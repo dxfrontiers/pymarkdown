@@ -1,7 +1,7 @@
 """
-Module to implement a sample plugin that has a bad starting_new_file function.
+Module to implement a sample plugin that has a bad next_line function.
 """
-from pymarkdown.plugin_manager.plugin_details import PluginDetails
+from pymarkdown.plugin_manager.plugin_details import PluginDetailsV2
 from pymarkdown.plugin_manager.rule_plugin import RulePlugin
 
 
@@ -14,13 +14,13 @@ class BadNextLine(RulePlugin):
         """
         Get the details for the plugin.
         """
-        return PluginDetails(
+        return PluginDetailsV2(
             plugin_name="bad-next-line",
             plugin_id="MDE003",
             plugin_enabled_by_default=True,
             plugin_description="Plugin that has a bad next_line function.",
             plugin_version="0.0.0",
-            plugin_interface_version=1,
+            plugin_supports_fix=True,
         )
 
     def next_line(self, context, line):

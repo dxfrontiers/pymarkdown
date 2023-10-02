@@ -9,7 +9,7 @@ import sys
 import traceback
 from abc import ABC, abstractmethod
 
-from pymarkdown.parser_helper import ParserHelper
+from pymarkdown.general.parser_helper import ParserHelper
 
 LOGGER = logging.getLogger(__name__)
 
@@ -92,6 +92,13 @@ class InProcessResult:
         Standard output collected during execution.
         """
         return self.__std_out
+
+    @property
+    def std_err(self):
+        """
+        Standard error collected during execution.
+        """
+        return self.__std_err
 
     # pylint: disable=too-many-arguments
     def assert_results(

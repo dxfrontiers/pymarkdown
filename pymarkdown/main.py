@@ -5,29 +5,29 @@ import argparse
 import logging
 import os
 import runpy
-import sys
-import tempfile
 import traceback
-from typing import List, Optional, cast
+from typing import List, Optional, Tuple, cast
 
 from application_properties import ApplicationProperties
 from application_properties.application_properties_utilities import (
     ApplicationPropertiesUtilities,
 )
 
-from pymarkdown.application_file_scanner import ApplicationFileScanner
+from pymarkdown.application_configuration_helper import ApplicationConfigurationHelper
+from pymarkdown.application_file_scanner import (
+    ApplicationFileScanner,
+    ApplicationFileScannerOutputProtocol,
+)
 from pymarkdown.application_logging import ApplicationLogging
-from pymarkdown.bad_tokenization_error import BadTokenizationError
 from pymarkdown.extension_manager.extension_manager import ExtensionManager
-from pymarkdown.extensions.pragma_token import PragmaToken
-from pymarkdown.main_presentation import MainPresentation
-from pymarkdown.markdown_token import MarkdownToken
-from pymarkdown.parser_logger import ParserLogger
+from pymarkdown.file_scan_helper import FileScanHelper
+from pymarkdown.general.bad_tokenization_error import BadTokenizationError
+from pymarkdown.general.main_presentation import MainPresentation
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.tokenized_markdown import TokenizedMarkdown
 from pymarkdown.plugin_manager.bad_plugin_error import BadPluginError
 from pymarkdown.plugin_manager.plugin_manager import PluginManager
-from pymarkdown.plugin_manager.plugin_scan_context import PluginScanContext
-from pymarkdown.source_providers import FileSourceProvider
-from pymarkdown.tokenized_markdown import TokenizedMarkdown
+from pymarkdown.return_code_helper import ApplicationResult, ReturnCodeHelper
 
 POGGER = ParserLogger(logging.getLogger(__name__))
 
@@ -39,11 +39,6 @@ class PyMarkdownLint:
     """
     Class to provide for a simple implementation of a title case algorithm.
     """
-
-    __default_configuration_file = ".pymarkdown"
-
-    __normal_scan_subcommand = "scan"
-    __stdin_scan_subcommand = "scan-stdin"
 
     def __init__(
         self,
@@ -88,6 +83,32 @@ class PyMarkdownLint:
         version_meta = runpy.run_path(file_path)
         return str(version_meta["__version__"])
 
+    def __initialize_subsystems(
+        self, direct_args: Optional[List[str]]
+    ) -> argparse.Namespace:
+        ReturnCodeHelper.reset()
+
+        args = self.__parse_arguments(direct_args=direct_args)
+        self.__set_initial_state(args)
+
+        self.__show_stack_trace = args.show_stack_trace
+        if not self.__show_stack_trace and self.__properties:
+            self.__show_stack_trace = self.__properties.get_boolean_property(
+                "log.stack-trace"
+            )
+
+        if self.__logging:
+            self.__logging.initialize(args)
+        ParserLogger.sync_on_next_call()
+
+        if direct_args is None:
+            LOGGER.debug("Using supplied command line arguments.")
+        else:
+            LOGGER.debug("Using direct arguments: %s", str(direct_args))
+
+        self.__initialize_plugins_and_extensions(args)
+        return args
+
     def __parse_arguments(self, direct_args: Optional[List[str]]) -> argparse.Namespace:
         parser = argparse.ArgumentParser(description="Lint any found Markdown files.")
 
@@ -115,6 +136,27 @@ class PyMarkdownLint:
             default="",
             help=argparse.SUPPRESS,
         )
+        parser.add_argument(
+            "-x-fix",
+            dest="x_fix",
+            action="store_true",
+            default="",
+            help=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "-x-fix-debug",
+            dest="x_fix_debug",
+            action="store_true",
+            default="",
+            help=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "-x-fix-file-debug",
+            dest="x_fix_file_debug",
+            action="store_true",
+            default="",
+            help=argparse.SUPPRESS,
+        )
 
         parser.add_argument(
             "--add-plugin",
@@ -132,24 +174,12 @@ class PyMarkdownLint:
             help="if an error occurs, print out the stack trace for debug purposes",
         )
         ApplicationLogging.add_default_command_line_arguments(parser)
+        ReturnCodeHelper.add_command_line_arguments(parser)
 
         subparsers = parser.add_subparsers(dest="primary_subparser")
-
         PluginManager.add_argparse_subparser(subparsers)
         ExtensionManager.add_argparse_subparser(subparsers)
-
-        new_sub_parser = subparsers.add_parser(
-            PyMarkdownLint.__normal_scan_subcommand,
-            help="scan the Markdown files in the specified paths",
-        )
-        ApplicationFileScanner.add_default_command_line_arguments(
-            new_sub_parser, ".md", "Markdown"
-        )
-
-        subparsers.add_parser(
-            PyMarkdownLint.__stdin_scan_subcommand,
-            help="scan the standard input as a Markdown file",
-        )
+        FileScanHelper.add_argparse_subparser(subparsers)
 
         subparsers.add_parser("version", help="version of the application")
 
@@ -157,89 +187,46 @@ class PyMarkdownLint:
 
         if not parse_arguments.primary_subparser:
             parser.print_help()
-            sys.exit(2)
+            ReturnCodeHelper.exit_application(ApplicationResult.COMMAND_LINE_ERROR)
         elif parse_arguments.primary_subparser == "version":
             print(f"{self.__version_number}")
-            sys.exit(0)
+            ReturnCodeHelper.exit_application(ApplicationResult.SUCCESS)
         return parse_arguments
 
-    def __scan_file(
-        self, source_provider: FileSourceProvider, next_file_name: str
-    ) -> None:  # sourcery skip: extract-method
-        """
-        Scan a given file and call the plugin manager for any significant events.
-        """
+    def __set_initial_state(self, args: argparse.Namespace) -> None:
+        if self.__logging:
+            self.__logging.pre_initialize_with_args(args)
 
-        POGGER.info("Scanning file '$'.", next_file_name)
-        context = self.__plugins.starting_new_file(next_file_name)
+        ApplicationConfigurationHelper.apply_configuration_layers(
+            args, self.__properties, self.__handle_error
+        )
 
-        try:
-            POGGER.info("Starting file '$'.", next_file_name)
+        ReturnCodeHelper.set_initial_state(args, self.__properties)
 
-            POGGER.info("Scanning file '$' token-by-token.", next_file_name)
-            assert self.__tokenizer
-            actual_tokens = self.__tokenizer.transform_from_provider(source_provider)
+        LOGGER.info("Configuration loaded and applied.  Initial state setup completed.")
 
-            source_provider.reset_to_start()
-            self.__process_file_scan(
-                context, source_provider, next_file_name, actual_tokens
+    def __initialize_plugins_and_extensions(self, args: argparse.Namespace) -> None:
+        self.__initialize_plugins(args)
+        self.__initialize_extensions(args)
+
+        if args.primary_subparser == PluginManager.argparse_subparser_name():
+            ReturnCodeHelper.exit_application(
+                self.__plugins.handle_argparse_subparser(args)
+            )
+        if args.primary_subparser == ExtensionManager.argparse_subparser_name():
+            ReturnCodeHelper.exit_application(
+                self.__extensions.handle_argparse_subparser(args)
             )
 
-            context.report_on_triggered_rules()
-            POGGER.info("Ending file '$'.", next_file_name)
-        except Exception:
-            context.report_on_triggered_rules()
-            POGGER.info("Ending file '$' with exception.", next_file_name)
-            raise
-
-    def __process_file_scan(
-        self,
-        context: PluginScanContext,
-        source_provider: FileSourceProvider,
-        next_file_name: str,
-        actual_tokens: List[MarkdownToken],
-    ) -> None:
-        if actual_tokens and actual_tokens[-1].is_pragma:
-            pragma_token = cast(PragmaToken, actual_tokens[-1])
-            self.__plugins.compile_pragmas(next_file_name, pragma_token.pragma_lines)
-            actual_tokens = actual_tokens[:-1]
-
-        POGGER.info("Scanning file '$' tokens.", next_file_name)
-        for next_token in actual_tokens:
-            POGGER.info("Processing token: $", next_token)
-            self.__plugins.next_token(context, next_token)
-
-        POGGER.info("Scanning file '$' line-by-line.", next_file_name)
-        line_number, next_line = 1, source_provider.get_next_line()
-        while next_line is not None:
-            POGGER.info("Processing line $: $", line_number, next_line)
-            self.__plugins.next_line(context, line_number, next_line)
-            line_number += 1
-            next_line = source_provider.get_next_line()
-
-        POGGER.info("Completed scanning file '$'.", next_file_name)
-        self.__plugins.completed_file(context, line_number)
-
-    # pylint: disable=broad-exception-caught
-    def __apply_configuration_to_plugins(self) -> None:
+    def __initialize_plugins(self, args: argparse.Namespace) -> None:
         try:
-            self.__plugins.apply_configuration(self.__properties)
-        except Exception as this_exception:
+            plugin_dir = os.path.dirname(os.path.realpath(__file__))
+            plugin_dir = os.path.join(plugin_dir, "plugins")
+            self.__initialize_plugin_manager(args, plugin_dir)
+            self.__apply_configuration_to_plugins()
+        except ValueError as this_exception:
             formatted_error = (
-                f"{type(this_exception).__name__} encountered while configuring plugins:\n"
-                + f"{this_exception}"
-            )
-            self.__handle_error(formatted_error, this_exception)
-
-    # pylint: enable=broad-exception-caught
-
-    def __initialize_parser(self) -> None:
-        try:
-            self.__tokenizer = TokenizedMarkdown()
-            self.__tokenizer.apply_configuration(self.__properties, self.__extensions)
-        except BadTokenizationError as this_exception:
-            formatted_error = (
-                f"{type(this_exception).__name__} encountered while initializing tokenizer:\n"
+                f"{type(this_exception).__name__} encountered while initializing plugins:\n"
                 + f"{this_exception}"
             )
             self.__handle_error(formatted_error, this_exception)
@@ -259,6 +246,7 @@ class PyMarkdownLint:
                 args.disable_rules,
                 self.__properties,
                 self.__show_stack_trace,
+                args.x_fix_debug,
             )
         except BadPluginError as this_exception:
             formatted_error = (
@@ -266,161 +254,18 @@ class PyMarkdownLint:
             )
             self.__handle_error(formatted_error, this_exception)
 
-    def __handle_error(
-        self,
-        formatted_error: str,
-        thrown_error: Optional[Exception],
-        exit_on_error: bool = True,
-    ) -> None:
-        LOGGER.warning(formatted_error, exc_info=thrown_error)
-
-        stack_trace = (
-            "\n" + traceback.format_exc()
-            if self.__show_stack_trace
-            and thrown_error
-            and not isinstance(thrown_error, ValueError)
-            else ""
-        )
-        self.__presentation.print_system_error(f"\n\n{formatted_error}{stack_trace}")
-        if exit_on_error:
-            sys.exit(1)
-
-    def __handle_scan_error(self, next_file: str, this_exception: Exception) -> None:
-        if formatted_error := self.__presentation.format_scan_error(
-            next_file, this_exception
-        ):
-            self.__handle_error(formatted_error, this_exception)
-        sys.exit(1)
-
-    def __handle_file_scanner_output(self, formatted_output: str) -> None:
-        self.__presentation.print_system_output(formatted_output)
-
-    def __handle_file_scanner_error(self, formatted_error: str) -> None:
-        self.__handle_error(formatted_error, None, exit_on_error=False)
-
-    def __scan_specific_file(self, next_file: str, next_file_name: str) -> None:
+    # pylint: disable=broad-exception-caught
+    def __apply_configuration_to_plugins(self) -> None:
         try:
-            source_provider = FileSourceProvider(next_file)
-            self.__scan_file(source_provider, next_file_name)
-        except BadPluginError as this_exception:
-            self.__handle_scan_error(next_file, this_exception)
-        except BadTokenizationError as this_exception:
-            self.__handle_scan_error(next_file, this_exception)
-
-    def __scan_from_stdin(self, args: argparse.Namespace) -> None:
-        temporary_file = None
-        scan_exception = None
-        scan_id = "stdin" if self.__string_to_scan is None else "in-memory"
-        try:
-            if args.x_test_stdin_fault:
-                raise IOError("made up")
-
-            with tempfile.NamedTemporaryFile("wt", delete=False) as outfile:
-                temporary_file = outfile.name
-
-                if self.__string_to_scan:
-                    outfile.write(self.__string_to_scan)
-                else:
-                    for line in sys.stdin:
-                        outfile.write(line)
-
-            self.__scan_specific_file(temporary_file, scan_id)
-
-        except IOError as this_exception:
-            scan_exception = this_exception
-        finally:
-            if temporary_file and os.path.exists(temporary_file):
-                os.remove(temporary_file)
-
-        if scan_exception:
-            try:
-                raise IOError(
-                    f"Temporary file to capture {scan_id} was not written ({scan_exception})."
-                ) from scan_exception
-            except IOError as this_exception:
-                self.__handle_scan_error(scan_id, this_exception)
-
-    def __process_files_to_scan(
-        self, args: argparse.Namespace, use_standard_in: bool, files_to_scan: List[str]
-    ) -> None:
-        # sourcery skip: raise-specific-error
-        if use_standard_in:
-            POGGER.debug("Scanning from: (stdin)")
-            self.__scan_from_stdin(args)
-
-        else:
-            POGGER.debug("Scanning from: $", files_to_scan)
-            for next_file in files_to_scan:
-                self.__scan_specific_file(next_file, next_file)
-
-    def __initialize_subsystems(
-        self, direct_args: Optional[List[str]]
-    ) -> argparse.Namespace:
-        args = self.__parse_arguments(direct_args=direct_args)
-        self.__set_initial_state(args)
-
-        self.__show_stack_trace = args.show_stack_trace
-        if not self.__show_stack_trace and self.__properties:
-            self.__show_stack_trace = self.__properties.get_boolean_property(
-                "log.stack-trace"
-            )
-
-        if self.__logging:
-            self.__logging.initialize(args)
-        ParserLogger.sync_on_next_call()
-
-        if direct_args is None:
-            LOGGER.debug("Using supplied command line arguments.")
-        else:
-            LOGGER.debug("Using direct arguments: %s", str(direct_args))
-
-        self.__initialize_plugins_and_extensions(args)
-        return args
-
-    def __set_initial_state(self, args: argparse.Namespace) -> None:
-        if self.__logging:
-            self.__logging.pre_initialize_with_args(args)
-
-        self.__apply_configuration_layers(args)
-
-        if args.strict_configuration or self.__properties.get_boolean_property(
-            "mode.strict-config", strict_mode=True
-        ):
-            self.__properties.enable_strict_mode()
-
-    def __apply_configuration_layers(self, args: argparse.Namespace) -> None:
-        ApplicationPropertiesUtilities.process_standard_python_configuration_files(
-            self.__properties, self.__handle_error
-        )
-
-        ApplicationPropertiesUtilities.process_project_specific_json_configuration(
-            PyMarkdownLint.__default_configuration_file,
-            args,
-            self.__properties,
-            self.__handle_error,
-        )
-
-    def __initialize_plugins_and_extensions(self, args: argparse.Namespace) -> None:
-        self.__initialize_plugins(args)
-        self.__initialize_extensions(args)
-
-        if args.primary_subparser == PluginManager.argparse_subparser_name():
-            sys.exit(self.__plugins.handle_argparse_subparser(args))
-        if args.primary_subparser == ExtensionManager.argparse_subparser_name():
-            sys.exit(self.__extensions.handle_argparse_subparser(args))
-
-    def __initialize_plugins(self, args: argparse.Namespace) -> None:
-        try:
-            plugin_dir = os.path.dirname(os.path.realpath(__file__))
-            plugin_dir = os.path.join(plugin_dir, "plugins")
-            self.__initialize_plugin_manager(args, plugin_dir)
-            self.__apply_configuration_to_plugins()
-        except ValueError as this_exception:
+            self.__plugins.apply_configuration(self.__properties)
+        except Exception as this_exception:
             formatted_error = (
-                f"{type(this_exception).__name__} encountered while initializing plugins:\n"
+                f"{type(this_exception).__name__} encountered while configuring plugins:\n"
                 + f"{this_exception}"
             )
             self.__handle_error(formatted_error, this_exception)
+
+    # pylint: enable=broad-exception-caught
 
     # pylint: disable=broad-exception-caught
     def __initialize_extensions(self, args: argparse.Namespace) -> None:
@@ -446,43 +291,133 @@ class PyMarkdownLint:
 
     # pylint: enable=broad-exception-caught
 
+    def __initialize_parser(self) -> None:
+        try:
+            self.__tokenizer = TokenizedMarkdown()
+            self.__tokenizer.apply_configuration(self.__properties, self.__extensions)
+        except BadTokenizationError as this_exception:
+            formatted_error = (
+                f"{type(this_exception).__name__} encountered while initializing tokenizer:\n"
+                + f"{this_exception}"
+            )
+            self.__handle_error(formatted_error, this_exception)
+
+    def __handle_error(
+        self,
+        formatted_error: str,
+        thrown_error: Optional[Exception],
+        exit_on_error: bool = True,
+    ) -> None:
+        LOGGER.warning(formatted_error, exc_info=thrown_error)
+
+        stack_trace = (
+            "\n" + traceback.format_exc()
+            if self.__show_stack_trace
+            and thrown_error
+            and not isinstance(thrown_error, ValueError)
+            else ""
+        )
+        self.__presentation.print_system_error(f"\n\n{formatted_error}{stack_trace}")
+        if exit_on_error:
+            ReturnCodeHelper.exit_application(ApplicationResult.SYSTEM_ERROR)
+
+    def __handle_file_scanner_output(self, formatted_output: str) -> None:
+        self.__presentation.print_system_output(formatted_output)
+
+    def __handle_file_scanner_error(self, formatted_error: str) -> None:
+        self.__handle_error(formatted_error, None, exit_on_error=False)
+
+    def __scan_files_if_no_errors(
+        self,
+        args: argparse.Namespace,
+        use_standard_in: bool,
+        files_to_scan: List[str],
+        did_error_scanning_files: bool,
+    ) -> ApplicationResult:  # sourcery skip: extract-method
+        scan_result = ApplicationResult.SUCCESS
+        did_fix_any_files = False
+        if did_error_scanning_files:
+            self.__handle_error("No matching files found.", None, exit_on_error=False)
+            scan_result = ApplicationResult.NO_FILES_TO_SCAN
+        else:
+            POGGER.info("Initializing parser.")
+            self.__initialize_parser()
+
+            POGGER.info("Processing files with parser.")
+            assert self.__tokenizer
+            fsh = FileScanHelper(
+                self.__tokenizer,
+                self.__plugins,
+                self.__presentation,
+                self.__show_stack_trace,
+                self.__handle_error,
+            )
+            did_fix_any_files = fsh.process_files_to_scan(
+                args, use_standard_in, files_to_scan, self.__string_to_scan
+            )
+            if did_fix_any_files:
+                scan_result = ApplicationResult.FIXED_AT_LEAST_ONE_FILE
+            elif self.__plugins.number_of_scan_failures:
+                scan_result = ApplicationResult.SCAN_TRIGGERED_AT_LEAST_ONCE
+            POGGER.info("Files have been processed.")
+
+        return scan_result
+
+    def __find_files_to_scan(
+        self, args: argparse.Namespace
+    ) -> Tuple[bool, List[str], bool, bool]:
+        files_to_scan: List[str] = []
+        did_error_scanning_files = False
+        did_only_list_files = False
+
+        use_standard_in = FileScanHelper.is_scan_stdin_specified(args)
+        if not use_standard_in:
+            POGGER.info("Determining files to scan.")
+            (
+                files_to_scan,
+                did_error_scanning_files,
+                did_only_list_files,
+            ) = ApplicationFileScanner.determine_files_to_scan_with_args(
+                args,
+                cast(
+                    ApplicationFileScannerOutputProtocol,
+                    self.__handle_file_scanner_output,
+                ),
+                cast(
+                    ApplicationFileScannerOutputProtocol,
+                    self.__handle_file_scanner_error,
+                ),
+            )
+        return (
+            use_standard_in,
+            files_to_scan,
+            did_error_scanning_files,
+            did_only_list_files,
+        )
+
     # pylint: disable=broad-exception-caught
     def main(self, direct_args: Optional[List[str]] = None) -> None:
         """
         Main entrance point.
         """
-        total_error_count = 0
+        scan_result = ApplicationResult.SUCCESS
         try:
             args = self.__initialize_subsystems(direct_args)
 
-            files_to_scan: List[str] = []
-            did_error_scanning_files = False
-
-            use_standard_in = (
-                args.primary_subparser == PyMarkdownLint.__stdin_scan_subcommand
-            )
-            if not use_standard_in:
-                POGGER.info("Determining files to scan.")
-                (
-                    files_to_scan,
-                    did_error_scanning_files,
-                ) = ApplicationFileScanner.determine_files_to_scan_with_args(
-                    args,
-                    self.__handle_file_scanner_output,
-                    self.__handle_file_scanner_error,
-                )
-            if did_error_scanning_files:
-                self.__handle_error(
-                    "No matching files found.", None, exit_on_error=False
-                )
-                total_error_count = 1
+            (
+                use_standard_in,
+                files_to_scan,
+                did_error_scanning_files,
+                did_only_list_files,
+            ) = self.__find_files_to_scan(args)
+            if did_only_list_files:
+                if not files_to_scan:
+                    scan_result = ApplicationResult.NO_FILES_TO_SCAN
+                ReturnCodeHelper.exit_application(scan_result)
             else:
-                POGGER.info("Initializing parser.")
-                self.__initialize_parser()
-
-                POGGER.info("Processing files with parser.")
-                self.__process_files_to_scan(args, use_standard_in, files_to_scan)
-                POGGER.info("Files have been processed.")
+                scan_result = self.__scan_files_if_no_errors(
+                    args, use_standard_in, files_to_scan, did_error_scanning_files
+                )
         except ValueError as this_exception:
             formatted_error = f"Configuration Error: {this_exception}"
             self.__handle_error(formatted_error, this_exception)
@@ -496,8 +431,7 @@ class PyMarkdownLint:
                 self.__logging.terminate()
             self.__logging = None
 
-        if self.__plugins.number_of_scan_failures or total_error_count:
-            sys.exit(1)
+        ReturnCodeHelper.exit_application(scan_result)
 
     # pylint: enable=broad-exception-caught
 

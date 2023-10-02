@@ -5,23 +5,25 @@ import logging
 from typing import List, Optional, Tuple, cast
 
 from pymarkdown.block_quotes.block_quote_data import BlockQuoteData
-from pymarkdown.constants import Constants
 from pymarkdown.container_blocks.container_helper import ContainerHelper
+from pymarkdown.general.constants import Constants
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.parser_state import ParserState
+from pymarkdown.general.position_marker import PositionMarker
+from pymarkdown.general.tab_helper import TabHelper
 from pymarkdown.inline.inline_backslash_helper import InlineBackslashHelper
-from pymarkdown.inline_markdown_token import TextMarkdownToken
 from pymarkdown.leaf_blocks.leaf_block_helper import LeafBlockHelper
-from pymarkdown.leaf_markdown_token import FencedCodeBlockMarkdownToken
-from pymarkdown.markdown_token import MarkdownToken
-from pymarkdown.parser_helper import ParserHelper
-from pymarkdown.parser_logger import ParserLogger
-from pymarkdown.parser_state import ParserState
-from pymarkdown.position_marker import PositionMarker
-from pymarkdown.stack_token import (
+from pymarkdown.tokens.fenced_code_block_markdown_token import (
+    FencedCodeBlockMarkdownToken,
+)
+from pymarkdown.tokens.markdown_token import MarkdownToken
+from pymarkdown.tokens.stack_token import (
     FencedCodeBlockStackToken,
     ParagraphStackToken,
     StackToken,
 )
-from pymarkdown.tab_helper import TabHelper
+from pymarkdown.tokens.text_markdown_token import TextMarkdownToken
 
 POGGER = ParserLogger(logging.getLogger(__name__))
 
@@ -901,11 +903,7 @@ class FencedLeafBlockProcessor:
             FencedCodeBlockStackToken, parser_state.token_stack[-1]
         )
         whitespace_start_count = fenced_stack_token.whitespace_start_count
-        was_indented = False
-        if not parser_state.token_stack[-2].is_document:
-            last_container_token = parser_state.token_stack[-2]
-            assert last_container_token.is_block_quote
-            was_indented = True
+        was_indented = not parser_state.token_stack[-2].is_document
 
         resolved_leaf_token_whitespace = ParserHelper.remove_all_from_text(
             leaf_token_whitespace
@@ -928,7 +926,7 @@ class FencedLeafBlockProcessor:
                 adj_original_index,
                 split_tab,
             ) = TabHelper.find_tabified_string(
-                original_line, reconstructed_line, abc=True
+                original_line, reconstructed_line, abc=True, was_indented=was_indented
             )
 
         (

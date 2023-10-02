@@ -9,7 +9,7 @@ from test.patches.patch_builtin_open import PatchBuiltinOpen
 from typing import Any
 
 from pymarkdown.api import PyMarkdownApi, PyMarkdownApiException
-from pymarkdown.source_providers import FileSourceProvider
+from pymarkdown.general.source_providers import FileSourceProvider
 
 
 def get_semantic_version():
@@ -102,7 +102,9 @@ class PatchFileSourceProvider(PatchBase):
     """
 
     def __init__(self) -> None:
-        super().__init__("pymarkdown.source_providers.FileSourceProvider.get_next_line")
+        super().__init__(
+            "pymarkdown.general.source_providers.FileSourceProvider.get_next_line"
+        )
 
     def start(self, log_action: bool = True) -> None:
         """
@@ -140,13 +142,16 @@ def test_api_tokenizer_failure_during_file_scan():
     source_path = os.path.join(
         "test", "resources", "rules", "md047", "end_with_blank_line.md"
     )
-    exception_path = os.path.join("pymarkdown", "resources", "entities.json")
+    exception_path = os.path.abspath(
+        os.path.join("pymarkdown", "resources", "entities.json")
+    )
 
     # Act
     caught_exception = None
     try:
         _ = FileSourceProvider(exception_path)
-        patch = PatchFileSourceProvider()
+        patch = PatchBuiltinOpen()
+        patch.register_exception_for_file(exception_path, "rt", IOError("bob"))
         patch.start()
 
         _ = PyMarkdownApi().scan_path(source_path)
@@ -159,8 +164,8 @@ def test_api_tokenizer_failure_during_file_scan():
     assert caught_exception, "Should have thrown an exception."
     assert (
         caught_exception.reason
-        == """BadTokenizationError encountered while scanning '{path}':
-An unhandled error occurred processing the document.""".replace(
-            "{path}", source_path
+        == """BadTokenizationError encountered while initializing tokenizer:
+Named character entity map file '{path}' was not loaded (bob).""".replace(
+            "{path}", exception_path
         )
     )

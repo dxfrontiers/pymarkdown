@@ -2,9 +2,10 @@
 Module to provide for linter instructions that can be embedded within the document.
 """
 import logging
-from typing import Callable, Dict, Optional, Set
+from typing import Dict, Optional, Set
 
 from application_properties import ApplicationPropertiesFacade
+from typing_extensions import Protocol
 
 from pymarkdown.container_blocks.parse_block_pass_properties import (
     ParseBlockPassProperties,
@@ -14,13 +15,31 @@ from pymarkdown.extension_manager.extension_manager_constants import (
     ExtensionManagerConstants,
 )
 from pymarkdown.extension_manager.parser_extension import ParserExtension
-from pymarkdown.markdown_token import MarkdownToken, MarkdownTokenClass
-from pymarkdown.parser_helper import ParserHelper
-from pymarkdown.parser_logger import ParserLogger
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.position_marker import PositionMarker
 from pymarkdown.plugin_manager.found_plugin import FoundPlugin
-from pymarkdown.position_marker import PositionMarker
+from pymarkdown.tokens.markdown_token import MarkdownToken, MarkdownTokenClass
+from pymarkdown.transform_gfm.transform_state import TransformState
+from pymarkdown.transform_markdown.markdown_transform_context import (
+    RegisterHtmlTransformHandlersProtocol,
+    RegisterMarkdownTransformHandlersProtocol,
+)
 
 POGGER = ParserLogger(logging.getLogger(__name__))
+
+
+# pylint: disable=too-few-public-methods
+class LogPragmaFailureProtocol(Protocol):
+    """
+    Protocol to specify a function that allows failures to be reported.
+    """
+
+    def __call__(self, scan_file: str, line_number: int, pragma_error: str) -> None:
+        ...  # pragma: no cover
+
+
+# pylint: enable=too-few-public-methods
 
 
 class PragmaExtension(ParserExtension):
@@ -114,7 +133,7 @@ class PragmaExtension(ParserExtension):
         pragma_lines: Dict[int, str],
         all_ids: Dict[str, FoundPlugin],
         document_pragmas: Dict[int, Set[str]],
-        log_pragma_failure: Callable[[str, int, str], None],
+        log_pragma_failure: LogPragmaFailureProtocol,
     ) -> None:
         """
         Compile a single pragma line, validating it before adding it to the dictionary of pragmas.
@@ -170,7 +189,7 @@ class PragmaExtension(ParserExtension):
     def __handle_disable_next_line(
         command_data: str,
         after_command_index: int,
-        log_pragma_failure: Callable[[str, int, str], None],
+        log_pragma_failure: LogPragmaFailureProtocol,
         scan_file: str,
         actual_line_number: int,
         document_pragmas: Dict[int, Set[str]],
@@ -229,9 +248,52 @@ class PragmaToken(MarkdownToken):
             extra_data=serialized_pragmas[1:],
         )
 
+    @staticmethod
+    def get_markdown_token_type() -> str:
+        """
+        Get the type of markdown token for rehydration purposes.
+        """
+        return MarkdownToken._token_pragma
+
     @property
     def pragma_lines(self) -> Dict[int, str]:
         """
         Returns the pragma lines for the document.
         """
         return self.__pragma_lines
+
+    def register_for_markdown_transform(
+        self,
+        registration_function: RegisterMarkdownTransformHandlersProtocol,
+    ) -> None:
+        """
+        Register any rehydration handlers for leaf markdown tokens.
+        """
+
+        # Note, because the Pragma token contains every pragma contained
+        # within the file, this is handled globally in TransformToMarkdown's
+        # __handle_pragma_processing.
+        _ = registration_function
+
+    @staticmethod
+    def register_for_html_transform(
+        register_handlers: RegisterHtmlTransformHandlersProtocol,
+    ) -> None:
+        """
+        Register any functions required to generate HTML from the tokens.
+        """
+        register_handlers(
+            PragmaToken,
+            PragmaToken.__handle_pragma_token,
+            None,
+        )
+
+    @staticmethod
+    def __handle_pragma_token(
+        output_html: str,
+        next_token: MarkdownToken,
+        transform_state: TransformState,
+    ) -> str:
+        _ = (transform_state, next_token)
+
+        return output_html

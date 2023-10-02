@@ -3,10 +3,10 @@ Module to implement a plugin that ensures that top-level lists are surrounded by
 """
 from typing import List, Optional
 
-from pymarkdown.markdown_token import MarkdownToken
 from pymarkdown.plugin_manager.plugin_details import PluginDetails
 from pymarkdown.plugin_manager.plugin_scan_context import PluginScanContext
 from pymarkdown.plugin_manager.rule_plugin import RulePlugin
+from pymarkdown.tokens.markdown_token import MarkdownToken
 
 
 class RuleMd032(RulePlugin):
@@ -51,6 +51,7 @@ class RuleMd032(RulePlugin):
                 not token.is_blank_line
                 and not token.is_new_list_item
                 and not token.is_list_end
+                and not token.is_end_of_stream
             ):
                 self.report_next_token_error(context, token, line_number_delta=-1)
             self.__end_list_end_token = None

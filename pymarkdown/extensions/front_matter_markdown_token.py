@@ -2,12 +2,19 @@
 Module to provide for a leaf element that can be added to markdown parsing stream that handles front matter.
 """
 import logging
-from typing import Dict, List, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast
 
-from pymarkdown.leaf_markdown_token import LeafMarkdownToken
-from pymarkdown.markdown_token import MarkdownToken
-from pymarkdown.parser_logger import ParserLogger
-from pymarkdown.position_marker import PositionMarker
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.position_marker import PositionMarker
+from pymarkdown.tokens.leaf_markdown_token import LeafMarkdownToken
+from pymarkdown.tokens.markdown_token import MarkdownToken
+from pymarkdown.transform_gfm.transform_state import TransformState
+from pymarkdown.transform_markdown.markdown_transform_context import (
+    MarkdownTransformContext,
+    RegisterHtmlTransformHandlersProtocol,
+    RegisterMarkdownTransformHandlersProtocol,
+)
 
 POGGER = ParserLogger(logging.getLogger(__name__))
 
@@ -41,6 +48,15 @@ class FrontMatterMarkdownToken(LeafMarkdownToken):
         self.__compose_extra_data_field()
 
     # pylint: enable=too-many-arguments
+    # pylint: disable=protected-access
+    @staticmethod
+    def get_markdown_token_type() -> str:
+        """
+        Get the type of markdown token for rehydration purposes.
+        """
+        return MarkdownToken._token_front_matter
+
+    # pylint: enable=protected-access
 
     @property
     def start_boundary_line(self) -> str:
@@ -99,3 +115,58 @@ class FrontMatterMarkdownToken(LeafMarkdownToken):
         Calculate the amount of whitespace for the token.
         """
         return 0, False
+
+    def register_for_markdown_transform(
+        self,
+        registration_function: RegisterMarkdownTransformHandlersProtocol,
+    ) -> None:
+        """
+        Register any rehydration handlers for leaf markdown tokens.
+        """
+        registration_function(
+            FrontMatterMarkdownToken,
+            FrontMatterMarkdownToken.__rehydrate_front_matter,
+            None,
+        )
+
+    @staticmethod
+    def __rehydrate_front_matter(
+        context: MarkdownTransformContext,
+        current_token: MarkdownToken,
+        previous_token: Optional[MarkdownToken],
+    ) -> str:
+        """
+        Rehydrate the front matter text from the token.
+        """
+        _ = previous_token, context
+
+        front_mater_token = cast(FrontMatterMarkdownToken, current_token)
+        front_matter_parts = [front_mater_token.start_boundary_line]
+        front_matter_parts.extend(front_mater_token.collected_lines)
+        front_matter_parts.extend([front_mater_token.end_boundary_line, ""])
+        return ParserHelper.newline_character.join(front_matter_parts)
+
+    @staticmethod
+    def register_for_html_transform(
+        register_handlers: RegisterHtmlTransformHandlersProtocol,
+    ) -> None:
+        """
+        Register any functions required to generate HTML from the tokens.
+        """
+        register_handlers(
+            FrontMatterMarkdownToken,
+            FrontMatterMarkdownToken.__handle_front_matter_token,
+            None,
+        )
+
+    @staticmethod
+    def __handle_front_matter_token(
+        output_html: str, next_token: MarkdownToken, transform_state: TransformState
+    ) -> str:
+        """
+        Handle the front matter token.  Note that it does not contribute anything
+        at all to the HTML output.
+        """
+        _ = (next_token, transform_state)
+
+        return output_html

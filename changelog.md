@@ -14,7 +14,76 @@
 
 - None
 
-## Version 0.9.12 - Date: 2023-07-2?
+## Version 0.9.13.4 - Date: 2023-09-09
+
+Note: noted there were some issues with the pymarkdown_test project and
+giving false positives.  Will be looking into that for the next release.
+
+### Fixed
+
+- [Issue 755](https://github.com/jackdewinter/pymarkdown/pull/755)
+  - fixed issue where new directories were not captured due to false positive
+- [Issue 759](https://github.com/jackdewinter/pymarkdown/pull/759)
+  - `code_blocks` property for MD010 was inverted
+  - will check for others like this as more fix mode work is done
+
+## Version 0.9.13 - Date: 2023-09-03
+
+This release had some new features, but the most interesting one of all is
+the start of the work on the `fix mode` that has been requested.  It is invoke
+by invoking the scan engine with `-x-fix scan` instead of `scan`.  It is still
+in the early stages, but you can experiment with it and rules md001, md009, md010,
+and md047 for which fix mode has been implemented.  Note that all the documentation
+will not reflect fix mode until it is further along, but try it out if you would
+like!
+
+In addition, because of requests, the following two features and one bug fix
+have been addressed:
+
+- YAML support
+  - YAML support is provided for default configuration using the `.pymarkdown.yml`
+    and `.pymarkdown.yaml` file
+    - note that the `.pymarkdown` file is checked first, and if present, YAML
+      default files will not be loaded
+  - YAML support is provided for the command line `--config` argument
+    - if the specified file does not parse as JSON, PyMarkdown will attempt to
+      parse it as YAML
+- Return Code Schemes
+  - the `--return-code-scheme` argument accepts either `default` or `minimal`
+  - `default` is the normaly return codes for PyMarkdown
+  - `minimal` returns a code of 0 even if no files were found or if there were
+    any rules triggered
+- Rule MD010
+  - The rule was not dealing with tabs in code-blocks properly
+  - Fixed so that any line that contains a code-block does not trigger the rule
+
+### Added
+
+- [Issue 618](https://github.com/jackdewinter/pymarkdown/issues/618)
+  - Alpha pass at fix mode
+  - Rules md001, md009, md010, and md047 support fix mode, but not documented
+- [Issue 691](https://github.com/jackdewinter/pymarkdown/issues/691)
+  - Allow YAML for configuration files
+
+### Changed
+
+- [Issue 723](https://github.com/jackdewinter/pymarkdown/issues/723)
+  - Moved test version of transform to markdown into application directory
+- [Issue 728](https://github.com/jackdewinter/pymarkdown/issues/728)
+  - Moved code from transform modules (html and markdown) into token classes
+  - Refactored modules to put them in more consistent directories
+- [Issue 737](https://github.com/jackdewinter/pymarkdown/issues/737)
+  - Rule MD010: Added code to not fire on fenced code blocks
+- [Issue 744](https://github.com/jackdewinter/pymarkdown/issues/744)
+  - Added ability to change return code profile
+- [Issue 746](https://github.com/jackdewinter/pymarkdown/issues/746)
+  - Moved scanning related code from main.py to new file module
+
+### Fixed
+
+- None
+
+## Version 0.9.12 - Date: 2023-07-24
 
 ### Added
 

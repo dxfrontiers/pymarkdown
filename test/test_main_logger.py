@@ -8,8 +8,8 @@ from test.markdown_scanner import MarkdownScanner
 
 from pymarkdown.application_logging import ApplicationLogging
 from pymarkdown.container_blocks.container_indices import ContainerIndices
-from pymarkdown.parser_logger import ParserLogger
-from pymarkdown.stack_token import StackToken
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.tokens.stack_token import StackToken
 
 from .utils import write_temporary_configuration
 
@@ -118,7 +118,7 @@ def test_markdown_with_dash_dash_log_level_invalid(caplog):
                [--add-plugin ADD_PLUGIN] [--config CONFIGURATION_FILE]
                [--set SET_CONFIGURATION] [--strict-config] [--stack-trace]
                [--log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
-               [--log-file LOG_FILE]
+               [--log-file LOG_FILE] [--return-code-scheme {default,minimal}]
                {plugins,extensions,scan,scan-stdin,version} ...
 main.py: error: argument --log-level: invalid validate_log_level_type value: 'invalid'
 """
