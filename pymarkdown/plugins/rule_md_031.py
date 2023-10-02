@@ -3,12 +3,12 @@ Module to implement a plugin that ensures that blank lines surround fenced block
 """
 from typing import List, Optional, cast
 
-from pymarkdown.inline_markdown_token import TextMarkdownToken
-from pymarkdown.markdown_token import EndMarkdownToken, MarkdownToken
-from pymarkdown.parser_helper import ParserHelper
+from pymarkdown.general.parser_helper import ParserHelper
 from pymarkdown.plugin_manager.plugin_details import PluginDetails
 from pymarkdown.plugin_manager.plugin_scan_context import PluginScanContext
 from pymarkdown.plugin_manager.rule_plugin import RulePlugin
+from pymarkdown.tokens.markdown_token import EndMarkdownToken, MarkdownToken
+from pymarkdown.tokens.text_markdown_token import TextMarkdownToken
 
 
 class RuleMd031(RulePlugin):
@@ -72,7 +72,7 @@ class RuleMd031(RulePlugin):
 
     def __handle_end_fenced_code_block(
         self, context: PluginScanContext, token: MarkdownToken
-    ) -> None:
+    ) -> None:  # sourcery skip: extract-method
         can_trigger = True
         if (
             self.__container_token_stack
@@ -80,10 +80,16 @@ class RuleMd031(RulePlugin):
         ):
             can_trigger = self.__trigger_in_list_items
         if not token.is_blank_line and can_trigger:
-            text_token = cast(TextMarkdownToken, self.__last_non_end_token)
-            line_number_delta = (
-                text_token.token_text.count(ParserHelper.newline_character) + 2
-            )
+            line_number_delta = 0
+            assert self.__last_non_end_token
+            if self.__last_non_end_token.is_text:
+                text_token = cast(TextMarkdownToken, self.__last_non_end_token)
+                line_number_delta = (
+                    text_token.token_text.count(ParserHelper.newline_character) + 2
+                )
+            else:
+                assert self.__last_non_end_token.is_fenced_code_block
+                line_number_delta = 0
             end_token = cast(EndMarkdownToken, self.__end_fenced_code_block_token)
             column_number_delta = end_token.start_markdown_token.column_number
             start_token = cast(EndMarkdownToken, end_token.start_markdown_token)

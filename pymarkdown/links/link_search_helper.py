@@ -2,29 +2,34 @@
 Module to provide for the ability to search the text for a link.
 """
 import logging
-from typing import Callable, List, Optional, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
-from pymarkdown.constants import Constants
-from pymarkdown.emphasis_helper import EmphasisHelper
-from pymarkdown.inline_markdown_token import (
-    EmailAutolinkMarkdownToken,
-    HardBreakMarkdownToken,
-    ImageStartMarkdownToken,
-    InlineCodeSpanMarkdownToken,
-    LinkStartMarkdownToken,
-    RawHtmlMarkdownToken,
-    ReferenceMarkdownToken,
-    SpecialTextMarkdownToken,
-    TextMarkdownToken,
+from pymarkdown.general.constants import Constants
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.inline.emphasis_helper import EmphasisHelper
+from pymarkdown.links.link_create_helper import (
+    LinkCreateHelper,
+    ProcessSimpleInlineProtocol,
 )
-from pymarkdown.links.link_create_helper import LinkCreateHelper
 from pymarkdown.links.link_helper_properties import LinkHelperProperties
 from pymarkdown.links.link_parse_helper import LinkParseHelper
-from pymarkdown.markdown_token import MarkdownToken
-from pymarkdown.parser_helper import ParserHelper
-from pymarkdown.parser_logger import ParserLogger
+from pymarkdown.tokens.email_autolink_markdown_token import EmailAutolinkMarkdownToken
+from pymarkdown.tokens.hard_break_markdown_token import HardBreakMarkdownToken
+from pymarkdown.tokens.image_start_markdown_token import ImageStartMarkdownToken
+from pymarkdown.tokens.inline_code_span_markdown_token import (
+    InlineCodeSpanMarkdownToken,
+)
+from pymarkdown.tokens.link_start_markdown_token import LinkStartMarkdownToken
+from pymarkdown.tokens.markdown_token import MarkdownToken
+from pymarkdown.tokens.raw_html_markdown_token import RawHtmlMarkdownToken
+from pymarkdown.tokens.special_text_markdown_token import SpecialTextMarkdownToken
+from pymarkdown.tokens.text_markdown_token import TextMarkdownToken
 
 POGGER = ParserLogger(logging.getLogger(__name__))
+
+
+# pylint: disable=too-few-public-methods
 
 
 class LinkSearchHelper:
@@ -45,7 +50,7 @@ class LinkSearchHelper:
         remaining_line: str,
         tabified_remaining_line: Optional[str],
         current_string_unresolved: str,
-        xx_fn: Callable[[str], str],
+        process_inlines_fn: ProcessSimpleInlineProtocol,
         tabified_text: Optional[str],
     ) -> Tuple[int, bool, Optional[MarkdownToken], bool]:
         """
@@ -95,7 +100,7 @@ class LinkSearchHelper:
                     remaining_line,
                     tabified_remaining_line,
                     current_string_unresolved,
-                    xx_fn,
+                    process_inlines_fn,
                     updated_index,
                     tabified_text,
                 )
@@ -130,7 +135,7 @@ class LinkSearchHelper:
         remaining_line: str,
         tabified_remaining_line: Optional[str],
         current_string_unresolved: str,
-        xx_fn: Callable[[str], str],
+        process_inlines_fn: ProcessSimpleInlineProtocol,
         updated_index: int,
         tabified_text: Optional[str],
     ) -> Tuple[bool, bool, int, Optional[MarkdownToken], bool, Optional[str]]:
@@ -165,7 +170,7 @@ class LinkSearchHelper:
                     remaining_line,
                     tabified_remaining_line,
                     current_string_unresolved,
-                    xx_fn,
+                    process_inlines_fn,
                     tabified_text,
                 )
                 if updated_index != -1:
@@ -279,7 +284,7 @@ class LinkSearchHelper:
         remaining_line: str,
         tabified_remaining_line: Optional[str],
         current_string_unresolved: str,
-        xx_fn: Callable[[str], str],
+        process_inlines_fn: ProcessSimpleInlineProtocol,
         tabified_text: Optional[str],
     ) -> Tuple[int, Optional[MarkdownToken], bool]:
         """
@@ -324,7 +329,7 @@ class LinkSearchHelper:
                 ind,
                 remaining_line,
                 current_string_unresolved,
-                xx_fn,
+                process_inlines_fn,
                 lhp,
                 update_index,
             )
@@ -562,7 +567,9 @@ class LinkSearchHelper:
         text_raw_parts: List[str],
     ) -> bool:
         link_token = cast(LinkStartMarkdownToken, inline_blocks[collect_index])
-        raw_text = LinkSearchHelper.rehydrate_inline_link_text_from_token(link_token)
+        raw_text = LinkStartMarkdownToken.rehydrate_inline_link_text_from_token(
+            link_token
+        )
         text_raw_parts.append(raw_text)
         return True
 
@@ -575,7 +582,7 @@ class LinkSearchHelper:
     ) -> None:
         image_token = cast(ImageStartMarkdownToken, inline_blocks[collect_index])
         text_raw_parts.append(
-            LinkSearchHelper.rehydrate_inline_image_text_from_token(image_token)
+            ImageStartMarkdownToken.rehydrate_inline_image_text_from_token(image_token)
         )
         text_parts.append(image_token.image_alt_text)
 
@@ -660,83 +667,5 @@ class LinkSearchHelper:
         text_parts.append(text_token.token_text)
         text_raw_parts.append(text_token.token_text)
 
-    @staticmethod
-    def rehydrate_inline_image_text_from_token(
-        image_token: ImageStartMarkdownToken,
-    ) -> str:
-        """
-        Given an image token, rehydrate it's original text from the token.
-        """
-        return f"!{LinkSearchHelper.rehydrate_inline_link_text_from_token(image_token)}"
 
-    @staticmethod
-    def __rehydrate_inline_link_text_from_token_type_inline(
-        link_token: ReferenceMarkdownToken, link_parts: List[str]
-    ) -> None:
-        assert link_token.before_title_whitespace is not None
-        assert link_token.before_link_whitespace is not None
-        link_parts.extend(
-            [
-                "[",
-                ParserHelper.remove_all_from_text(link_token.text_from_blocks),
-                "](",
-                link_token.before_link_whitespace,
-                f"<{link_token.active_link_uri}>"
-                if link_token.did_use_angle_start
-                else link_token.active_link_uri,
-                link_token.before_title_whitespace,
-            ]
-        )
-        if link_token.active_link_title:
-            if link_token.inline_title_bounding_character == "'":
-                title_prefix = "'"
-                title_suffix = "'"
-            elif link_token.inline_title_bounding_character == "(":
-                title_prefix = "("
-                title_suffix = ")"
-            else:
-                title_prefix = '"'
-                title_suffix = '"'
-
-            assert link_token.after_title_whitespace is not None
-            link_parts.extend(
-                [
-                    title_prefix,
-                    link_token.active_link_title,
-                    title_suffix,
-                    link_token.after_title_whitespace,
-                ]
-            )
-        link_parts.append(")")
-
-    @staticmethod
-    def rehydrate_inline_link_text_from_token(
-        link_token: ReferenceMarkdownToken,
-    ) -> str:
-        """
-        Given a link token, rehydrate it's original text from the token.
-        """
-
-        link_parts = []
-        if link_token.label_type == Constants.link_type__shortcut:
-            link_parts.extend(
-                [
-                    "[",
-                    ParserHelper.remove_all_from_text(link_token.text_from_blocks),
-                    "]",
-                ]
-            )
-        elif link_token.label_type == Constants.link_type__full:
-            assert link_token.ex_label is not None
-            link_parts.extend(
-                ["[", link_token.text_from_blocks, "][", link_token.ex_label, "]"]
-            )
-        elif link_token.label_type == Constants.link_type__collapsed:
-            link_parts.extend(["[", link_token.text_from_blocks, "][]"])
-        else:
-            assert link_token.label_type == Constants.link_type__inline
-            LinkSearchHelper.__rehydrate_inline_link_text_from_token_type_inline(
-                link_token, link_parts
-            )
-
-        return "".join(link_parts)
+# pylint: enable=too-few-public-methods

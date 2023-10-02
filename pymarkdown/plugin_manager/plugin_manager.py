@@ -7,22 +7,29 @@ import logging
 import os
 import re
 import sys
+from io import TextIOWrapper
 from typing import Any, Dict, List, Optional, Pattern, Set, Tuple
 
 from application_properties import ApplicationProperties, ApplicationPropertiesFacade
 from columnar import columnar
 
 from pymarkdown.extensions.pragma_token import PragmaExtension
-from pymarkdown.main_presentation import MainPresentation
-from pymarkdown.markdown_token import MarkdownToken
-from pymarkdown.parser_helper import ParserHelper
+from pymarkdown.general.main_presentation import MainPresentation
+from pymarkdown.general.parser_helper import ParserHelper
 from pymarkdown.plugin_manager.bad_plugin_error import BadPluginError
+from pymarkdown.plugin_manager.fix_line_record import FixLineRecord
+from pymarkdown.plugin_manager.fix_token_record import FixTokenRecord
 from pymarkdown.plugin_manager.found_plugin import FoundPlugin
+from pymarkdown.plugin_manager.plugin_details import PluginDetailsV2
 from pymarkdown.plugin_manager.plugin_scan_context import PluginScanContext
 from pymarkdown.plugin_manager.plugin_scan_failure import PluginScanFailure
 from pymarkdown.plugin_manager.rule_plugin import RulePlugin
+from pymarkdown.return_code_helper import ApplicationResult
+from pymarkdown.tokens.markdown_token import MarkdownToken
 
 LOGGER = logging.getLogger(__name__)
+
+# pylint: disable=too-many-lines
 
 
 # pylint: disable=too-many-instance-attributes
@@ -47,7 +54,8 @@ class PluginManager:
             self.number_of_scan_failures,
             self.number_of_pragma_failures,
             self.__show_stack_trace,
-        ) = (0, 0, False)
+            self.__show_fix_debug,
+        ) = (0, 0, False, False)
         self.__loaded_classes: List[Tuple[RulePlugin, str]] = []
 
         self.__presentation = presentation
@@ -71,6 +79,7 @@ class PluginManager:
         disable_rules_from_command_line: str,
         properties: ApplicationProperties,
         show_stack_trace: bool,
+        show_fix_debug: bool,
     ) -> None:
         """
         Initializes the manager by scanning for plugins, loading them, and registering them.
@@ -80,7 +89,8 @@ class PluginManager:
             self.number_of_pragma_failures,
             self.__loaded_classes,
             self.__show_stack_trace,
-        ) = (0, 0, [], show_stack_trace)
+            self.__show_fix_debug,
+        ) = (0, 0, [], show_stack_trace, show_fix_debug)
 
         plugin_files = self.__find_eligible_plugins_in_directory(directory_to_search)
         self.__load_plugins(directory_to_search, plugin_files)
@@ -198,7 +208,9 @@ class PluginManager:
         if next_plugin.plugin_version != "0.0.0" or args.show_all:
             self.__show_row_if_matches(list_re, next_plugin_id, next_plugin, show_rows)
 
-    def __handle_argparse_subparser_list(self, args: argparse.Namespace) -> int:
+    def __handle_argparse_subparser_list(
+        self, args: argparse.Namespace
+    ) -> ApplicationResult:
         list_re = None
         if args.list_filter:
             list_re = re.compile(
@@ -219,11 +231,11 @@ class PluginManager:
                 "version",
             ]
             self.__print_columnar_data(headers, show_rows)
-            return 0
+            return ApplicationResult.SUCCESS
         self.__presentation.print_system_error(
             f"No plugin rule identifiers matches the pattern '{args.list_filter}'."
         )
-        return 1
+        return ApplicationResult.NO_FILES_TO_SCAN
 
     def __show_row_if_matches(
         self,
@@ -261,7 +273,9 @@ class PluginManager:
             ParserHelper.newline_character.join(new_rows)
         )
 
-    def __handle_argparse_subparser_info(self, args: argparse.Namespace) -> int:
+    def __handle_argparse_subparser_info(
+        self, args: argparse.Namespace
+    ) -> ApplicationResult:
         matching_plugins: List[FoundPlugin] = list(
             filter(
                 lambda x: args.info_filter in x.plugin_identifiers,
@@ -272,7 +286,7 @@ class PluginManager:
             self.__presentation.print_system_error(
                 f"Unable to find a plugin with an id or name of '{args.info_filter}'."
             )
-            return 1
+            return ApplicationResult.NO_FILES_TO_SCAN
 
         found_plugin = matching_plugins[0]
         show_rows = [
@@ -289,24 +303,20 @@ class PluginManager:
 
         headers = ["Item", "Description"]
         self.__print_columnar_data(headers, show_rows)
-        return 0
+        return ApplicationResult.SUCCESS
 
-    def handle_argparse_subparser(self, args: argparse.Namespace) -> int:
+    def handle_argparse_subparser(self, args: argparse.Namespace) -> ApplicationResult:
         """
         Handle the parsing for this subparser.
         """
-        return_code, subparser_value = 0, getattr(
-            args, PluginManager.__root_subparser_name
-        )
+        subparser_value = getattr(args, PluginManager.__root_subparser_name)
         if subparser_value == "list":
-            return_code = self.__handle_argparse_subparser_list(args)
-        elif subparser_value == "info":
-            return_code = self.__handle_argparse_subparser_info(args)
-        else:
-            assert PluginManager.__argparse_subparser
-            PluginManager.__argparse_subparser.print_help()
-            sys.exit(2)
-        return return_code
+            return self.__handle_argparse_subparser_list(args)
+        if subparser_value == "info":
+            return self.__handle_argparse_subparser_info(args)
+        assert PluginManager.__argparse_subparser
+        PluginManager.__argparse_subparser.print_help()
+        return ApplicationResult.COMMAND_LINE_ERROR
 
     def log_scan_failure(self, scan_failure: PluginScanFailure) -> None:
         """
@@ -559,6 +569,7 @@ class PluginManager:
             plugin_url,
             plugin_configuration,
             plugin_names,
+            plugin_supports_fix,
         ) = self.__unpack_plugin_details(plugin_instance)
 
         self.__verify_string_field(plugin_instance, "plugin_id", plugin_id)
@@ -591,22 +602,26 @@ class PluginManager:
             instance_file_name,
             plugin_url,
             plugin_configuration,
+            plugin_supports_fix,
             [plugin_id, *plugin_names],
         )
 
-        if plugin_object.plugin_interface_version != 1:
+        if plugin_object.plugin_interface_version not in (1, 2):
             raise BadPluginError(
                 formatted_message=f"Plugin '{instance_file_name}' with an interface version "
-                + f"('{plugin_object.plugin_interface_version}') that is not '1'."
+                + f"('{plugin_object.plugin_interface_version}') that is not '1' or '2'."
             )
 
         return plugin_object
 
     def __unpack_plugin_details(
         self, plugin_instance: RulePlugin
-    ) -> Tuple[str, str, str, bool, str, int, Optional[str], Optional[str], List[str]]:
+    ) -> Tuple[
+        str, str, str, bool, str, int, Optional[str], Optional[str], List[str], bool
+    ]:
         try:
             instance_details = plugin_instance.get_details()
+            plugin_supports_fix = False
             (
                 plugin_id,
                 plugin_name,
@@ -626,6 +641,11 @@ class PluginManager:
                 instance_details.plugin_url,
                 instance_details.plugin_configuration,
             )
+            if (
+                isinstance(instance_details, PluginDetailsV2)
+                and plugin_interface_version == 2
+            ):
+                plugin_supports_fix = instance_details.plugin_supports_fix
         except Exception as this_exception:
             raise BadPluginError(
                 class_name=type(plugin_instance).__name__,
@@ -648,6 +668,7 @@ class PluginManager:
             plugin_url,
             plugin_configuration,
             plugin_names,
+            plugin_supports_fix,
         )
 
     def __register_plugin_id(
@@ -759,6 +780,12 @@ class PluginManager:
                 properties,
             )
 
+        # Non-windows system may report these in weird orders, so sort them to have
+        # a predictable order.
+        self.__enabled_plugins = sorted(
+            self.__enabled_plugins, reverse=False, key=lambda plugin: plugin.plugin_id
+        )
+
     @property
     def all_plugin_ids(self) -> List[str]:
         """
@@ -832,7 +859,13 @@ class PluginManager:
             if next_plugin.plugin_instance.is_starting_new_file_implemented_in_plugin:
                 self.__enabled_plugins_for_starting_new_file.append(next_plugin)
 
-    def starting_new_file(self, file_being_started: str) -> PluginScanContext:
+    def starting_new_file(
+        self,
+        file_being_started: str,
+        fix_mode: bool,
+        temp_output: Optional[TextIOWrapper],
+        fix_token_map: Optional[Dict[MarkdownToken, List[FixTokenRecord]]],
+    ) -> PluginScanContext:
         """
         Inform any listeners that a new current file has been started.
         """
@@ -847,33 +880,175 @@ class PluginManager:
                     cause=this_exception,
                 ) from this_exception
 
-        return PluginScanContext(self, file_being_started)
+        context = PluginScanContext(
+            self, file_being_started, fix_mode, temp_output, fix_token_map
+        )
+        context.set_last_line_fixed(None)
+        return context
+
+    def __completed_file_fix_mode_middle(
+        self,
+        context: PluginScanContext,
+        current_fix_line: Optional[str],
+        next_plugin: FoundPlugin,
+        line_number: int,
+    ) -> Tuple[Optional[str], FixLineRecord]:
+        if current_fix_line is not None:
+            plugin_id_list = ",".join(next_plugin.plugin_names)
+            formatted_message = f"Plugin {next_plugin.plugin_id}({plugin_id_list}) attempted to rewrite a completion line."
+            raise BadPluginError(  # pragma: no cover
+                formatted_message=formatted_message
+            )
+        current_fix_line = context.current_fix_line
+        line_append_record = FixLineRecord(
+            "completed_file", line_number, next_plugin.plugin_id
+        )
+        return current_fix_line, line_append_record
+
+    def __completed_file_fix_mode_end(
+        self,
+        context: PluginScanContext,
+        current_fix_line: Optional[str],
+        line_append_record: Optional[FixLineRecord],
+    ) -> None:
+        if current_fix_line is not None:
+            if self.__show_fix_debug:
+                replaced_line = current_fix_line.replace("\n", "\\n").replace(
+                    "\t", "\\t"
+                )
+                print(f"cf-ltw:{replaced_line}:")
+            context.file_output.write(current_fix_line)
+
+            assert line_append_record is not None
+            context.add_fix_line_record(line_append_record)
 
     def completed_file(self, context: PluginScanContext, line_number: int) -> None:
         """
         Inform any listeners that the current file has been completed.
         """
         context.line_number = line_number
+        current_fix_line: Optional[str] = None
+        line_append_record: Optional[FixLineRecord] = None
+
+        # This skip added for the assert True.  Without the assert True, code coverage
+        # believes that only one of the paths were covered.
+        # sourcery skip: remove-assert-true
         for next_plugin in self.__enabled_plugins_for_completed_file:
+            if context.in_fix_mode and not next_plugin.plugin_supports_fix:
+                continue
             try:
+                if context.in_fix_mode:
+                    context.set_current_fix_line(None)
                 next_plugin.plugin_instance.completed_file(context)
+                if context.in_fix_mode and context.current_fix_line is not None:
+                    (
+                        current_fix_line,
+                        line_append_record,
+                    ) = self.__completed_file_fix_mode_middle(
+                        context, current_fix_line, next_plugin, line_number
+                    )
+                assert True
             except Exception as this_exception:
                 raise BadPluginError(
                     next_plugin.plugin_id,
                     inspect.stack()[0].function,
                     cause=this_exception,
                 ) from this_exception
+        if context.in_fix_mode:
+            self.__completed_file_fix_mode_end(
+                context, current_fix_line, line_append_record
+            )
 
+    def __next_line_fix_mode_end(
+        self,
+        context: PluginScanContext,
+        line: str,
+        is_last_line_in_file: bool,
+        was_newline_added_at_end_of_file: bool,
+    ) -> None:
+        was_line_fixed = True
+        if is_last_line_in_file:
+            if self.__show_fix_debug:
+                print(
+                    f"was_newline_added_at_end_of_file={was_newline_added_at_end_of_file}"
+                )
+                assert context.last_line_fixed is not None
+                replaced_line = context.last_line_fixed.replace("\n", "\\n").replace(
+                    "\t", "\\t"
+                )
+                print(f"fixed:{replaced_line}:")
+            is_line_empty = not line
+            was_modified = (
+                context.last_line_fixed is not None
+                and context.last_line_fixed.endswith("\n")
+            )
+            if self.__show_fix_debug:
+                print(f"is_line_empty={is_line_empty}")
+                print(f"was_modified={was_modified}")
+            line_to_write = line
+            was_line_fixed = not (is_line_empty and was_modified)
+            # if was_newline_added_at_end_of_file and was_line_fixed:
+            #     line_to_write += "\n"
+        else:
+            line_to_write = line + "\n"
+
+        if self.__show_fix_debug:
+            replaced_line = line_to_write.replace("\n", "\\n").replace("\t", "\\t")
+            print(f"nl-ltw:{replaced_line}:")
+        context.file_output.write(line_to_write)
+        if was_line_fixed:
+            context.set_last_line_fixed(line_to_write)
+
+    def __next_line_fix_mode_before(
+        self, context: PluginScanContext, line: str, next_plugin: FoundPlugin
+    ) -> None:
+        context.set_current_fix_line(None)
+        if self.__show_fix_debug:
+            replaced_line = line.replace("\n", "\\n").replace("\t", "\\t")
+            print(f"{next_plugin.plugin_id}-before:{replaced_line}:")
+
+    def __next_line_fix_mode_after(
+        self,
+        context: PluginScanContext,
+        line: str,
+        line_number: int,
+        next_plugin: FoundPlugin,
+    ) -> str:
+        assert context.current_fix_line is not None
+        line = context.current_fix_line
+        if self.__show_fix_debug:
+            replaced_line = line.replace("\n", "\\n").replace("\t", "\\t")
+            print(f"{next_plugin.plugin_id}-after :{replaced_line}:")
+        line_append_record = FixLineRecord(
+            "next_line", line_number, next_plugin.plugin_id
+        )
+        context.add_fix_line_record(line_append_record)
+        return line
+
+    # pylint: disable=too-many-arguments
     def next_line(
-        self, context: PluginScanContext, line_number: int, line: str
+        self,
+        context: PluginScanContext,
+        line_number: int,
+        line: str,
+        is_last_line_in_file: bool,
+        was_newline_added_at_end_of_file: bool,
     ) -> None:
         """
         Inform any listeners that a new line has been loaded.
         """
         context.line_number = line_number
         for next_plugin in self.__enabled_plugins_for_next_line:
+            if context.in_fix_mode and not next_plugin.plugin_supports_fix:
+                continue
             try:
+                if context.in_fix_mode:
+                    self.__next_line_fix_mode_before(context, line, next_plugin)
                 next_plugin.plugin_instance.next_line(context, line)
+                if context.current_fix_line is not None:
+                    line = self.__next_line_fix_mode_after(
+                        context, line, line_number, next_plugin
+                    )
             except Exception as this_exception:
                 actual_line = line if self.__show_stack_trace else None
 
@@ -884,6 +1059,13 @@ class PluginManager:
                     actual_line=actual_line,
                     cause=this_exception,
                 ) from this_exception
+
+        if context.in_fix_mode:
+            self.__next_line_fix_mode_end(
+                context, line, is_last_line_in_file, was_newline_added_at_end_of_file
+            )
+
+    # pylint: enable=too-many-arguments
 
     def next_token(self, context: PluginScanContext, token: MarkdownToken) -> None:
         """

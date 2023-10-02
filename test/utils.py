@@ -5,18 +5,20 @@ import difflib
 import json
 import logging
 import os
+import shutil
 import tempfile
-from test.transform_to_markdown import TransformToMarkdown
+from contextlib import contextmanager
 
 from application_properties import ApplicationProperties
 
 from pymarkdown.extension_manager.extension_manager import ExtensionManager
-from pymarkdown.main_presentation import MainPresentation
-from pymarkdown.parser_helper import ParserHelper
-from pymarkdown.parser_logger import ParserLogger
-from pymarkdown.tab_helper import TabHelper
-from pymarkdown.tokenized_markdown import TokenizedMarkdown
+from pymarkdown.general.main_presentation import MainPresentation
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.tab_helper import TabHelper
+from pymarkdown.general.tokenized_markdown import TokenizedMarkdown
 from pymarkdown.transform_gfm.transform_to_gfm import TransformToGfm
+from pymarkdown.transform_markdown.transform_to_markdown import TransformToMarkdown
 
 # from test.verify_line_and_column_numbers import verify_line_and_column_numbers
 
@@ -30,6 +32,7 @@ def act_and_assert(
     config_map=None,
     disable_consistency_checks=False,
     allow_alternate_markdown=False,
+    do_add_end_of_stream_token=False,
 ):
     """
     Act and assert on the expected behavior of parsing the source_markdown.
@@ -50,7 +53,11 @@ def act_and_assert(
     transformer = TransformToGfm()
 
     # Act
-    actual_tokens = tokenizer.transform(source_markdown, show_debug=show_debug)
+    actual_tokens = tokenizer.transform(
+        source_markdown,
+        show_debug=show_debug,
+        do_add_end_of_stream_token=do_add_end_of_stream_token,
+    )
     actual_gfm = transformer.transform(actual_tokens)
 
     # Assert
@@ -68,6 +75,26 @@ def act_and_assert(
 
 
 # pylint: enable=too-many-arguments
+
+
+def copy_to_temporary_file(source_path: str) -> str:
+    """
+    Copy an existing markdown file to a temporary markdown file,
+    to allow fo fixing the file without destroying the original.
+    """
+    with tempfile.NamedTemporaryFile("wt", delete=False, suffix=".md") as outfile:
+        temporary_file = outfile.name
+
+        shutil.copyfile(source_path, temporary_file)
+        return os.path.abspath(temporary_file)
+
+
+def read_contents_of_text_file(source_path: str) -> str:
+    """
+    Read the entire contents of the specified file into the variable.
+    """
+    with open(source_path, "rt", encoding="utf-8") as source_file:
+        return source_file.read()
 
 
 def write_temporary_configuration(
@@ -100,6 +127,33 @@ def write_temporary_configuration(
         raise AssertionError(
             f"Test configuration file was not written ({this_exception})."
         ) from this_exception
+
+
+def assert_file_is_as_expected(source_path: str, expected_file_contents: str) -> None:
+    """
+    Assert that the file contents match the expected contents.
+    """
+    actual_file_contents = read_contents_of_text_file(source_path)
+
+    if expected_file_contents != actual_file_contents:
+        print(
+            "Expected:"
+            + expected_file_contents.replace("\n", "\\n").replace("\t", "\\t")
+            + ":"
+        )
+        print(
+            "  Actual:"
+            + actual_file_contents.replace("\n", "\\n").replace("\t", "\\t")
+            + ":"
+        )
+        expected_file_lines = expected_file_contents.splitlines(keepends=True)
+        # print("Expected:" + str(ex) + ":")
+        actual_file_lines = actual_file_contents.splitlines(keepends=True)
+        # print("  Actual:" + str(ac) + ":")
+        diff = difflib.ndiff(expected_file_lines, actual_file_lines)
+        diff_values = "-\n-".join(list(diff))
+        print("-" + diff_values + "-")
+        raise AssertionError()
 
 
 def assert_if_lists_different(expected_tokens, actual_tokens):
@@ -224,3 +278,17 @@ def __verify_markdown_roundtrip(
         (detabified_source_markdown is not None)
         and (detabified_source_markdown == markdown_from_tokens)
     ), f"Markdown strings are not equal.{diff_values}"
+
+
+@contextmanager
+def copy_to_temp_file(file_to_copy):
+    """
+    Context manager to copy a file to a temporary file, returning the name of the temporary file.
+    """
+    temp_source_path = None
+    try:
+        temp_source_path = copy_to_temporary_file(file_to_copy)
+        yield temp_source_path
+    finally:
+        if temp_source_path:
+            os.remove(temp_source_path)

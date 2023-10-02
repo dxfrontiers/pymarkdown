@@ -1,14 +1,17 @@
 """
 Extra tests.
 """
-from test.utils import act_and_assert
+import os
+import tempfile
+from test.markdown_scanner import MarkdownScanner
+from test.utils import act_and_assert, write_temporary_configuration
 
 import pytest
 
-from pymarkdown.container_markdown_token import BlockQuoteMarkdownToken
 from pymarkdown.extensions.front_matter_markdown_token import FrontMatterMarkdownToken
-from pymarkdown.parser_helper import ParserHelper
-from pymarkdown.position_marker import PositionMarker
+from pymarkdown.general.parser_helper import ParserHelper
+from pymarkdown.general.position_marker import PositionMarker
+from pymarkdown.tokens.block_quote_markdown_token import BlockQuoteMarkdownToken
 
 # pylint: disable=too-many-lines
 
@@ -4228,6 +4231,246 @@ def test_extra_029h():
 
     # Act & Assert
     act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_030xx():
+    """
+    TBD - from test_md010_bad_xxx
+    """
+
+    # Arrange
+    source_markdown = """1. ```text\tdef
+   this contains\ta tab
+   ```
+"""
+    expected_tokens = [
+        "[olist(1,1):.:1:3::   \n   \n]",
+        "[fcode-block(1,4):`:3:text::\tdef:::]",
+        "[text(2,4):this contains\ta tab:]",
+        "[end-fcode-block:::3:False]",
+        "[BLANK(4,1):]",
+        "[end-olist:::True]",
+    ]
+    expected_gfm = """<ol>
+<li>
+<pre><code class="language-text">this contains\ta tab
+</code></pre>
+</li>
+</ol>"""
+
+    # Act & Assert
+    act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_030xa():
+    """
+    TBD - from test_md010_bad_xxx
+    """
+
+    # Arrange
+    source_markdown = """+ ```text\tdef
+  this contains\ta tab
+  ```
+"""
+    expected_tokens = [
+        "[ulist(1,1):+::2::  \n  \n]",
+        "[fcode-block(1,3):`:3:text::\tdef:::]",
+        "[text(2,3):this contains\ta tab:]",
+        "[end-fcode-block:::3:False]",
+        "[BLANK(4,1):]",
+        "[end-ulist:::True]",
+    ]
+    expected_gfm = """<ul>
+<li>
+<pre><code class="language-text">this contains\ta tab
+</code></pre>
+</li>
+</ul>"""
+
+    # Act & Assert
+    act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_030ax():
+    """
+    TBD - from test_md010_bad_xxx
+    """
+
+    # Arrange
+    source_markdown = """1.  ```text\tdef
+    this contains\ta tab
+    ```
+"""
+    expected_tokens = [
+        "[olist(1,1):.:1:4::    \n    \n]",
+        "[fcode-block(1,5):`:3:text::\tdef:::]",
+        "[text(2,5):this contains\ta tab:]",
+        "[end-fcode-block:::3:False]",
+        "[BLANK(4,1):]",
+        "[end-olist:::True]",
+    ]
+    expected_gfm = """<ol>
+<li>
+<pre><code class="language-text">this contains\ta tab
+</code></pre>
+</li>
+</ol>"""
+
+    # Act & Assert
+    act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_030aa():
+    """
+    TBD - from test_md010_bad_xxx
+    """
+
+    # Arrange
+    source_markdown = """+   ```text\tdef
+    this contains\ta tab
+    ```
+"""
+    expected_tokens = [
+        "[ulist(1,1):+::4::    \n    \n]",
+        "[fcode-block(1,5):`:3:text::\tdef:::]",
+        "[text(2,5):this contains\ta tab:]",
+        "[end-fcode-block:::3:False]",
+        "[BLANK(4,1):]",
+        "[end-ulist:::True]",
+    ]
+    expected_gfm = """<ul>
+<li>
+<pre><code class="language-text">this contains\ta tab
+</code></pre>
+</li>
+</ul>"""
+
+    # Act & Assert
+    act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_030bx():
+    """
+    TBD - from test_md010_bad_xxx
+    """
+
+    # Arrange
+    source_markdown = """1.  ```text\tdef
+\tthis contains\ta tab
+\t```
+"""
+    expected_tokens = [
+        "[olist(1,1):.:1:4::\t\n\t\n]",
+        "[fcode-block(1,5):`:3:text::\tdef:::]",
+        "[text(2,2):this contains\ta tab:]",
+        "[end-fcode-block:::3:False]",
+        "[BLANK(4,1):]",
+        "[end-olist:::True]",
+    ]
+    expected_gfm = """<ol>
+<li>
+<pre><code class="language-text">this contains\ta tab
+</code></pre>
+</li>
+</ol>"""
+
+    # Act & Assert
+    act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_030ba():
+    """
+    TBD - from test_md010_bad_xxx
+    """
+
+    # Arrange
+    source_markdown = """+   ```text\tdef
+\tthis contains\ta tab
+\t```
+"""
+    expected_tokens = [
+        "[ulist(1,1):+::4::\t\n\t\n]",
+        "[fcode-block(1,5):`:3:text::\tdef:::]",
+        "[text(2,2):this contains\ta tab:]",
+        "[end-fcode-block:::3:False]",
+        "[BLANK(4,1):]",
+        "[end-ulist:::True]",
+    ]
+    expected_gfm = """<ul>
+<li>
+<pre><code class="language-text">this contains\ta tab
+</code></pre>
+</li>
+</ul>"""
+
+    # Act & Assert
+    act_and_assert(source_markdown, expected_gfm, expected_tokens)
+
+
+@pytest.mark.gfm
+def test_extra_031x():
+    """
+    TBD - from test_md010_bad_xxx
+
+    test_markdown_with_config_json_configuration_file
+    """
+
+    # Arrange
+    scanner = MarkdownScanner()
+    stdin_to_use = """This is an example of running `dig @8.8.8.8 MX +noall +ans oisix.com`:
+
+```text
+oisix.com.\t\t300\tIN\tMX\t10 mail01.oisix.com.
+oisix.com.\t\t300\tIN\tMX\t100 mail02.oisix.com.
+oisix.com.\t\t300\tIN\tMX\t150 mx.idc.jp.
+oisix.com.\t\t300\tIN\tMX\t160 mx2.idc.jp.
+oisix.com.\t\t300\tIN\tMX\t250 mx3.idc.jp.
+```
+"""
+    specified_configuration = """{
+    "plugins" : {
+        "no-hard-tabs": {
+            "enabled": true,
+            "code_blocks": false
+        }
+    }
+}
+"""
+
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        configuration_file = None
+        try:
+            configuration_file = write_temporary_configuration(
+                specified_configuration, file_name="myconfig", directory=tmp_dir_path
+            )
+            supplied_arguments = [
+                "-c",
+                configuration_file,
+                "scan-stdin",
+            ]
+
+            expected_return_code = 0
+            expected_output = ""
+            expected_error = ""
+
+            # Act
+            execute_results = scanner.invoke_main(
+                arguments=supplied_arguments, standard_input_to_use=stdin_to_use
+            )
+        finally:
+            if configuration_file and os.path.exists(configuration_file):
+                os.remove(configuration_file)
+
+    # Assert
+    execute_results.assert_results(
+        expected_output, expected_error, expected_return_code
+    )
 
 
 @pytest.mark.gfm

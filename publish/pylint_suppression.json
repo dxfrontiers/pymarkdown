@@ -6,11 +6,14 @@
             "too-many-instance-attributes": 1,
             "too-many-public-methods": 1
         },
+        "pymarkdown/application_configuration_helper.py": {
+            "too-few-public-methods": 1
+        },
         "pymarkdown/application_file_scanner.py": {
+            "too-few-public-methods": 1,
             "too-many-arguments": 2
         },
         "pymarkdown/application_logging.py": {},
-        "pymarkdown/bad_tokenization_error.py": {},
         "pymarkdown/block_quotes/block_quote_count_helper.py": {
             "too-many-arguments": 7
         },
@@ -23,10 +26,9 @@
         "pymarkdown/block_quotes/block_quote_processor.py": {
             "too-many-arguments": 4
         },
-        "pymarkdown/coalesce_processor.py": {
+        "pymarkdown/coalesce/coalesce_processor.py": {
             "too-few-public-methods": 1
         },
-        "pymarkdown/constants.py": {},
         "pymarkdown/container_blocks/container_block_leaf_processor.py": {
             "too-few-public-methods": 1,
             "too-many-arguments": 5,
@@ -43,23 +45,16 @@
             "too-many-arguments": 1
         },
         "pymarkdown/container_blocks/container_grab_bag.py": {
+            "too-few-public-methods": 1,
+            "too-many-arguments": 2,
             "too-many-instance-attributes": 1,
-            "too-many-public-methods": 1,
-            "too-many-arguments": 1
+            "too-many-public-methods": 1
         },
         "pymarkdown/container_blocks/container_helper.py": {
             "too-few-public-methods": 1
         },
         "pymarkdown/container_blocks/container_indices.py": {},
         "pymarkdown/container_blocks/parse_block_pass_properties.py": {},
-        "pymarkdown/container_markdown_token.py": {
-            "too-many-arguments": 4,
-            "too-many-instance-attributes": 1
-        },
-        "pymarkdown/emphasis_helper.py": {
-            "too-few-public-methods": 1,
-            "too-many-arguments": 1
-        },
         "pymarkdown/extension_manager/__init__.py": {},
         "pymarkdown/extension_manager/extension_impl.py": {
             "too-many-instance-attributes": 1
@@ -73,25 +68,63 @@
         "pymarkdown/extensions/disallowed_raw_html.py": {},
         "pymarkdown/extensions/extended_autolinks.py": {},
         "pymarkdown/extensions/extension_one.py": {},
+        "pymarkdown/extensions/extension_token_types.py": {
+            "too-few-public-methods": 1
+        },
         "pymarkdown/extensions/front_matter_extension.py": {},
         "pymarkdown/extensions/front_matter_markdown_token.py": {
-            "too-many-arguments": 1
+            "too-many-arguments": 1,
+            "protected-access": 1
         },
         "pymarkdown/extensions/markdown_strikethrough.py": {},
         "pymarkdown/extensions/markdown_tables.py": {},
         "pymarkdown/extensions/pragma_token.py": {
+            "too-few-public-methods": 1,
             "too-many-arguments": 2
         },
         "pymarkdown/extensions/task_list_items.py": {},
+        "pymarkdown/file_scan_helper.py": {
+            "too-many-arguments": 3
+        },
+        "pymarkdown/general/__init__.py": {},
+        "pymarkdown/general/bad_tokenization_error.py": {},
+        "pymarkdown/general/constants.py": {},
+        "pymarkdown/general/main_presentation.py": {},
+        "pymarkdown/general/parser_helper.py": {
+            "too-many-public-methods": 1,
+            "too-many-arguments": 1
+        },
+        "pymarkdown/general/parser_logger.py": {},
+        "pymarkdown/general/parser_state.py": {
+            "too-few-public-methods": 2,
+            "too-many-arguments": 1,
+            "too-many-instance-attributes": 1
+        },
+        "pymarkdown/general/position_marker.py": {},
+        "pymarkdown/general/requeue_line_info.py": {},
+        "pymarkdown/general/source_providers.py": {
+            "deprecated-decorator": 1
+        },
+        "pymarkdown/general/tab_helper.py": {
+            "too-many-arguments": 1
+        },
+        "pymarkdown/general/tokenized_markdown.py": {
+            "too-many-arguments": 5
+        },
         "pymarkdown/html/html_helper.py": {
             "too-many-arguments": 1
         },
         "pymarkdown/html/html_raw_helper.py": {},
+        "pymarkdown/inline/emphasis_helper.py": {
+            "too-few-public-methods": 1,
+            "too-many-arguments": 1
+        },
         "pymarkdown/inline/inline_autolink_helper.py": {},
         "pymarkdown/inline/inline_backslash_helper.py": {},
         "pymarkdown/inline/inline_backtick_helper.py": {},
         "pymarkdown/inline/inline_character_reference_helper.py": {},
         "pymarkdown/inline/inline_handler_helper.py": {
+            "too-few-public-methods": 1,
             "too-many-arguments": 9,
             "too-many-locals": 1
         },
@@ -118,11 +151,6 @@
             "too-many-arguments": 12,
             "too-many-locals": 4
         },
-        "pymarkdown/inline_markdown_token.py": {
-            "too-many-arguments": 6,
-            "too-many-instance-attributes": 1,
-            "protected-access": 2
-        },
         "pymarkdown/leaf_blocks/atx_leaf_block_processor.py": {
             "too-many-arguments": 4
         },
@@ -148,12 +176,8 @@
             "too-many-arguments": 3
         },
         "pymarkdown/leaf_blocks/thematic_leaf_block_processor.py": {},
-        "pymarkdown/leaf_markdown_token.py": {
-            "too-many-arguments": 4,
-            "too-many-instance-attributes": 1
-        },
         "pymarkdown/links/link_create_helper.py": {
-            "too-few-public-methods": 1,
+            "too-few-public-methods": 2,
             "too-many-arguments": 3
         },
         "pymarkdown/links/link_helper_properties.py": {
@@ -178,6 +202,7 @@
         "pymarkdown/links/link_reference_titles.py": {},
         "pymarkdown/links/link_reference_tuple.py": {},
         "pymarkdown/links/link_search_helper.py": {
+            "too-few-public-methods": 1,
             "too-many-arguments": 5,
             "too-many-locals": 1
         },
@@ -202,26 +227,13 @@
             "too-many-instance-attributes": 1,
             "broad-exception-caught": 3
         },
-        "pymarkdown/main_presentation.py": {},
-        "pymarkdown/markdown_token.py": {
-            "too-many-public-methods": 1,
-            "too-many-instance-attributes": 1,
-            "too-many-arguments": 2
-        },
-        "pymarkdown/parser_helper.py": {
-            "too-many-public-methods": 1,
-            "too-many-arguments": 1
-        },
-        "pymarkdown/parser_logger.py": {},
-        "pymarkdown/parser_state.py": {
-            "too-few-public-methods": 2,
-            "too-many-arguments": 1,
-            "too-many-instance-attributes": 1
-        },
         "pymarkdown/plugin_manager/__init__.py": {},
         "pymarkdown/plugin_manager/bad_plugin_error.py": {
             "too-many-arguments": 1
         },
+        "pymarkdown/plugin_manager/bad_plugin_fix_error.py": {},
+        "pymarkdown/plugin_manager/fix_line_record.py": {},
+        "pymarkdown/plugin_manager/fix_token_record.py": {},
         "pymarkdown/plugin_manager/found_plugin.py": {
             "too-many-instance-attributes": 1
         },
@@ -230,14 +242,18 @@
         },
         "pymarkdown/plugin_manager/plugin_manager.py": {
             "too-many-instance-attributes": 1,
-            "too-many-arguments": 2
+            "too-many-arguments": 3
+        },
+        "pymarkdown/plugin_manager/plugin_modify_context.py": {
+            "deprecated-decorator": 2
         },
         "pymarkdown/plugin_manager/plugin_scan_context.py": {
-            "too-many-arguments": 1
+            "too-many-instance-attributes": 1,
+            "too-many-arguments": 3
         },
         "pymarkdown/plugin_manager/plugin_scan_failure.py": {},
         "pymarkdown/plugin_manager/rule_plugin.py": {
-            "too-many-arguments": 1
+            "too-many-arguments": 2
         },
         "pymarkdown/plugins/__init__.py": {},
         "pymarkdown/plugins/plugin_one.py": {},
@@ -304,24 +320,118 @@
         "pymarkdown/plugins/rule_md_046.py": {},
         "pymarkdown/plugins/rule_md_047.py": {},
         "pymarkdown/plugins/rule_md_048.py": {},
-        "pymarkdown/position_marker.py": {},
-        "pymarkdown/requeue_line_info.py": {},
-        "pymarkdown/source_providers.py": {},
-        "pymarkdown/stack_token.py": {
+        "pymarkdown/return_code_helper.py": {},
+        "pymarkdown/tokens/atx_heading_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/blank_line_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/block_quote_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/container_markdown_token.py": {
+            "too-many-arguments": 1
+        },
+        "pymarkdown/tokens/email_autolink_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/emphasis_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/end_of_stream_token.py": {},
+        "pymarkdown/tokens/fenced_code_block_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/hard_break_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/html_block_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/image_start_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/indented_code_block_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/inline_code_span_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/inline_markdown_token.py": {
+            "too-many-arguments": 1
+        },
+        "pymarkdown/tokens/leaf_markdown_token.py": {
+            "too-many-arguments": 1
+        },
+        "pymarkdown/tokens/link_reference_definition_markdown_token.py": {
+            "too-many-instance-attributes": 1,
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/link_start_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/list_start_markdown_token.py": {
+            "too-many-instance-attributes": 1,
+            "too-many-arguments": 1
+        },
+        "pymarkdown/tokens/list_start_markdown_token_helper.py": {},
+        "pymarkdown/tokens/markdown_token.py": {
+            "too-many-public-methods": 1,
+            "too-many-instance-attributes": 1,
+            "too-many-arguments": 2
+        },
+        "pymarkdown/tokens/new_list_item_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/ordered_list_start_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/paragraph_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/raw_html_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/reference_markdown_token.py": {
+            "too-many-instance-attributes": 1,
+            "too-many-arguments": 1
+        },
+        "pymarkdown/tokens/setext_heading_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/special_text_markdown_token.py": {
+            "too-many-arguments": 1
+        },
+        "pymarkdown/tokens/stack_token.py": {
             "too-many-arguments": 3,
             "too-many-instance-attributes": 1
         },
-        "pymarkdown/tab_helper.py": {},
-        "pymarkdown/tokenized_markdown.py": {
-            "too-many-arguments": 5
+        "pymarkdown/tokens/text_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/thematic_break_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/token_types.py": {},
+        "pymarkdown/tokens/unordered_list_start_markdown_token.py": {
+            "too-many-arguments": 1,
+            "protected-access": 1
+        },
+        "pymarkdown/tokens/uri_autolink_markdown_token.py": {
+            "protected-access": 1
+        },
+        "pymarkdown/transform_gfm/transform_state.py": {
+            "too-many-instance-attributes": 1
         },
         "pymarkdown/transform_gfm/transform_to_gfm.py": {
-            "too-few-public-methods": 1
-        },
-        "pymarkdown/transform_gfm/transform_to_gfm_container_token_handlers.py": {
-            "too-few-public-methods": 1
-        },
-        "pymarkdown/transform_gfm/transform_to_gfm_leaf_token_handlers.py": {
             "too-few-public-methods": 1
         },
         "pymarkdown/transform_gfm/transform_to_gfm_list_looseness.py": {
@@ -331,20 +441,40 @@
             "too-few-public-methods": 1,
             "too-many-arguments": 1
         },
-        "pymarkdown/transform_state.py": {
-            "too-many-instance-attributes": 1
+        "pymarkdown/transform_markdown/markdown_transform_context.py": {
+            "too-few-public-methods": 9,
+            "too-many-arguments": 1
+        },
+        "pymarkdown/transform_markdown/transform_block_quote.py": {},
+        "pymarkdown/transform_markdown/transform_containers.py": {
+            "too-few-public-methods": 1,
+            "too-many-arguments": 4,
+            "too-many-locals": 1,
+            "too-many-boolean-expressions": 1
+        },
+        "pymarkdown/transform_markdown/transform_list_block.py": {
+            "too-many-arguments": 3,
+            "too-many-locals": 1
+        },
+        "pymarkdown/transform_markdown/transform_new_list_item.py": {
+            "too-few-public-methods": 1,
+            "too-many-arguments": 1
+        },
+        "pymarkdown/transform_markdown/transform_to_markdown.py": {
+            "too-many-arguments": 1
         },
         "pymarkdown/version.py": {}
     },
     "disables-by-name": {
-        "too-many-instance-attributes": 21,
+        "too-many-instance-attributes": 22,
         "too-many-public-methods": 4,
-        "too-many-arguments": 174,
-        "too-few-public-methods": 23,
-        "too-many-locals": 16,
+        "too-few-public-methods": 40,
+        "too-many-arguments": 193,
+        "too-many-locals": 18,
         "chained-comparison": 1,
-        "too-many-boolean-expressions": 1,
-        "protected-access": 2,
+        "too-many-boolean-expressions": 2,
+        "protected-access": 23,
+        "deprecated-decorator": 3,
         "broad-exception-caught": 3
     }
 }

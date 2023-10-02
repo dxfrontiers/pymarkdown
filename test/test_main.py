@@ -4,12 +4,11 @@ Module to provide tests related to the basic parts of the scanner.
 import logging
 import os
 import runpy
-from test.api.test_api_general import PatchFileSourceProvider
 from test.markdown_scanner import MarkdownScanner
 from test.patches.patch_builtin_open import PatchBuiltinOpen
 
-from pymarkdown.parser_logger import ParserLogger
-from pymarkdown.source_providers import FileSourceProvider
+from pymarkdown.general.parser_logger import ParserLogger
+from pymarkdown.general.source_providers import FileSourceProvider
 
 POGGER = ParserLogger(logging.getLogger(__name__))
 
@@ -28,7 +27,7 @@ def test_markdown_with_no_parameters():
                [--add-plugin ADD_PLUGIN] [--config CONFIGURATION_FILE]
                [--set SET_CONFIGURATION] [--strict-config] [--stack-trace]
                [--log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
-               [--log-file LOG_FILE]
+               [--log-file LOG_FILE] [--return-code-scheme {default,minimal}]
                {plugins,extensions,scan,scan-stdin,version} ...
 
 Lint any found Markdown files.
@@ -60,7 +59,9 @@ optional arguments:
   --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}
                         minimum level required to log messages
   --log-file LOG_FILE   destination file for log messages
-"""
+  --return-code-scheme {default,minimal}
+                        scheme to choose for selecting the application return
+                        code"""
     expected_error = ""
 
     # Act
@@ -88,6 +89,7 @@ def test_markdown_with_no_parameters_through_module():
                    [--set SET_CONFIGURATION] [--strict-config] [--stack-trace]
                    [--log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
                    [--log-file LOG_FILE]
+                   [--return-code-scheme {default,minimal}]
                    {plugins,extensions,scan,scan-stdin,version} ...
 
 Lint any found Markdown files.
@@ -119,7 +121,9 @@ optional arguments:
   --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}
                         minimum level required to log messages
   --log-file LOG_FILE   destination file for log messages
-"""
+  --return-code-scheme {default,minimal}
+                        scheme to choose for selecting the application return
+                        code"""
     expected_error = ""
 
     # Act
@@ -146,7 +150,7 @@ def test_markdown_with_no_parameters_through_main():
                [--add-plugin ADD_PLUGIN] [--config CONFIGURATION_FILE]
                [--set SET_CONFIGURATION] [--strict-config] [--stack-trace]
                [--log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
-               [--log-file LOG_FILE]
+               [--log-file LOG_FILE] [--return-code-scheme {default,minimal}]
                {plugins,extensions,scan,scan-stdin,version} ...
 
 Lint any found Markdown files.
@@ -178,7 +182,9 @@ optional arguments:
   --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}
                         minimum level required to log messages
   --log-file LOG_FILE   destination file for log messages
-"""
+  --return-code-scheme {default,minimal}
+                        scheme to choose for selecting the application return
+                        code"""
     expected_error = ""
 
     # Act
@@ -204,7 +210,7 @@ def test_markdown_with_dash_h():
                [--add-plugin ADD_PLUGIN] [--config CONFIGURATION_FILE]
                [--set SET_CONFIGURATION] [--strict-config] [--stack-trace]
                [--log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
-               [--log-file LOG_FILE]
+               [--log-file LOG_FILE] [--return-code-scheme {default,minimal}]
                {plugins,extensions,scan,scan-stdin,version} ...
 
 Lint any found Markdown files.
@@ -236,7 +242,9 @@ optional arguments:
   --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG}
                         minimum level required to log messages
   --log-file LOG_FILE   destination file for log messages
-"""
+  --return-code-scheme {default,minimal}
+                        scheme to choose for selecting the application return
+                        code"""
     expected_error = ""
 
     # Act
@@ -251,6 +259,9 @@ optional arguments:
 def test_markdown_with_version():
     """
     Test to make sure we get help if 'version' is supplied.
+
+    This function is shadowed by
+    test_markdown_return_code_default_success.
     """
 
     # Arrange
@@ -280,6 +291,9 @@ def test_markdown_with_version():
 def test_markdown_with_direct_args(caplog):
     """
     Test to make sure we can specify the arguments directly.
+
+    This function is shadowed by
+    test_markdown_return_code_default_no_files_to_scan.
     """
 
     # Arrange
@@ -351,20 +365,25 @@ def test_markdown_with_failure_during_file_scan():
         "scan",
         source_path,
     ]
-    exception_path = os.path.join("pymarkdown", "resources", "entities.json")
+    exception_path = os.path.abspath(
+        os.path.join("pymarkdown", "resources", "entities.json")
+    )
 
     expected_return_code = 1
     expected_output = ""
-    expected_error = """BadTokenizationError encountered while scanning '{source_path}':
-An unhandled error occurred processing the document.
+    expected_error = """
+    
+BadTokenizationError encountered while initializing tokenizer:
+Named character entity map file '{source_path}' was not loaded (bob).
 """.replace(
-        "{source_path}", source_path
+        "{source_path}", exception_path
     )
 
     # Act
     try:
         _ = FileSourceProvider(exception_path)
-        patch = PatchFileSourceProvider()
+        patch = PatchBuiltinOpen()
+        patch.register_exception_for_file(exception_path, "rt", IOError("bob"))
         patch.start()
 
         execute_results = scanner.invoke_main(arguments=supplied_arguments)

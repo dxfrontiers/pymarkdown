@@ -42,6 +42,9 @@ optional arguments:
 def test_markdown_with_dash_l_only():
     """
     Test to make sure we get simple help if '-l' is supplied without any paths
+
+    This function is shadowed by
+    test_markdown_return_code_default_command_line_error.
     """
 
     # Arrange
@@ -450,6 +453,7 @@ def test_markdown_with_dash_l_and_dash_r_on_directory():
 {rules_source_path}rule_md046.md
 {rules_source_path}rule_md047.md
 {rules_source_path}rule_md048.md
+{rules_source_path}rule_md049.md
 {source_path}writing_rule_plugins.md""".replace(
             "{source_path}", source_path
         )

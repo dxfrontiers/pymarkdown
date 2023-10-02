@@ -4,10 +4,10 @@ blank lines.
 """
 from typing import Optional
 
-from pymarkdown.markdown_token import MarkdownToken
 from pymarkdown.plugin_manager.plugin_details import PluginDetails
 from pymarkdown.plugin_manager.plugin_scan_context import PluginScanContext
 from pymarkdown.plugin_manager.rule_plugin import RulePlugin
+from pymarkdown.tokens.markdown_token import MarkdownToken
 
 
 class RuleMd022(RulePlugin):
@@ -70,12 +70,12 @@ class RuleMd022(RulePlugin):
         self.__start_heading_token = None
         self.__did_heading_end = False
 
-    def completed_file(self, context: PluginScanContext) -> None:
-        """
-        Event that the file being currently scanned is now completed.
-        """
-        if (self.__blank_line_count != -1) and self.__blank_line_count >= 0:
-            self.perform_close_check(context, None)
+    # def completed_file(self, context: PluginScanContext) -> None:
+    #     """
+    #     Event that the file being currently scanned is now completed.
+    #     """
+    #     if (self.__blank_line_count != -1) and self.__blank_line_count >= 0:
+    #         self.perform_close_check(context, None)
 
     def __next_token_heading_start(self, token: MarkdownToken) -> None:
         # print(">>token.is_setext_heading or token.is_atx_heading>>")
